@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="tokyo">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -25,8 +25,13 @@
                 <li><a href="#chat" class="nav-link active" data-view="chat">💬 Chat</a></li>
                 <li><a href="#dashboard" class="nav-link" data-view="dashboard">📊 Dashboard</a></li>
                 <li><a href="#tasks" class="nav-link" data-view="tasks">📋 Tasks</a></li>
+                <li><a href="#calendar" class="nav-link" data-view="calendar">📆 Calendar</a></li>
                 <li><a href="#notes" class="nav-link" data-view="notes">📝 Notes</a></li>
             </ul>
+            <div class="sidebar-bottom">
+                <button class="btn-icon" onclick="openCommandPalette()" title="Command Palette (⌘K)">🎯</button>
+                <button class="btn-icon" onclick="openThemePicker()" title="Themes">🎨</button>
+            </div>
             <div class="sidebar-footer">
                 <div class="status-indicator" id="connectionStatus"></div>
                 <span id="connectionText">Connecting...</span>
@@ -71,90 +76,27 @@
                     <span class="subtitle">System overview</span>
                     <button class="btn-secondary" onclick="refreshDashboard()">🔄 Refresh</button>
                 </header>
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>🤖 Clawdbot Gateway</h3>
-                            <span class="card-status online" id="vm-indicator"></span>
-                        </div>
-                        <div class="card-stats">
-                            <div class="stat">
-                                <span class="stat-value" id="vm-status">Checking...</span>
-                                <span class="stat-label">Status</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="vm-cpu">—</span>
-                                <span class="stat-label">Agent</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="vm-memory">—</span>
-                                <span class="stat-label">Endpoint</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>✨ Nova Portal</h3>
-                            <span class="card-status online" id="ec2-indicator"></span>
-                        </div>
-                        <div class="card-stats">
-                            <div class="stat">
-                                <span class="stat-value" id="ec2-status">Online</span>
-                                <span class="stat-label">Status</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="ec2-disk">v2.0</span>
-                                <span class="stat-label">Version</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="ec2-ip">4 features</span>
-                                <span class="stat-label">Features</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>🔗 Tunnel</h3>
-                            <span class="card-status online" id="ts-indicator"></span>
-                        </div>
-                        <div class="card-stats">
-                            <div class="stat">
-                                <span class="stat-value" id="tailscale-devices">4</span>
-                                <span class="stat-label">Endpoints</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="tailscale-status">Active</span>
-                                <span class="stat-label">Status</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>🔒 Access</h3>
-                            <span class="card-status online" id="email-indicator"></span>
-                        </div>
-                        <div class="card-stats">
-                            <div class="stat">
-                                <span class="stat-value" id="email-unread">30 days</span>
-                                <span class="stat-label">Session</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="email-account">Eric only</span>
-                                <span class="stat-label">Policy</span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="dashboard-grid" id="dashboardGrid">
+                    <!-- Widgets rendered by JS -->
                 </div>
                 <div class="dashboard-footer">
                     <span id="lastUpdated">Last updated: Never</span>
+                    <button class="btn-secondary" onclick="openWidgetPicker()">+ Add Widget</button>
                 </div>
             </div>
 
-            <!-- Tasks View (Kanban) -->
+            <!-- Tasks View -->
             <div id="tasks" class="view">
                 <header class="view-header">
                     <h1>Tasks</h1>
-                    <span class="subtitle">Kanban board</span>
+                    <div class="project-selector">
+                        <select id="projectSelect" onchange="switchProject(this.value)">
+                            <option value="personal">🏠 Personal</option>
+                            <option value="laundromat">🧺 Laundromat</option>
+                            <option value="nova-dev">✨ Nova Dev</option>
+                        </select>
+                        <button class="btn-icon-sm" onclick="openProjectManager()" title="Manage Projects">⚙️</button>
+                    </div>
                     <button class="btn-primary" onclick="openTaskModal()">+ Add Task</button>
                 </header>
                 <div class="kanban-board">
@@ -179,6 +121,30 @@
                         </div>
                         <div class="kanban-cards" id="done-cards"></div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div id="calendar" class="view">
+                <header class="view-header">
+                    <h1>Calendar</h1>
+                    <span class="subtitle" id="calendarMonth">January 2026</span>
+                    <div class="calendar-nav">
+                        <button class="btn-icon" onclick="prevMonth()">←</button>
+                        <button class="btn-secondary" onclick="goToToday()">Today</button>
+                        <button class="btn-icon" onclick="nextMonth()">→</button>
+                    </div>
+                    <button class="btn-primary" onclick="openEventModal()">+ Add Event</button>
+                </header>
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid"></div>
+                </div>
+                <div class="upcoming-events">
+                    <h3>📅 Upcoming</h3>
+                    <div id="upcomingEvents"></div>
                 </div>
             </div>
 
@@ -219,6 +185,14 @@
         </main>
     </div>
 
+    <!-- Command Palette -->
+    <div class="modal command-palette" id="commandPalette">
+        <div class="modal-content palette-content">
+            <input type="text" id="paletteSearch" placeholder="Type a command..." autocomplete="off">
+            <div class="palette-results" id="paletteResults"></div>
+        </div>
+    </div>
+
     <!-- Task Modal -->
     <div class="modal" id="taskModal">
         <div class="modal-content">
@@ -257,6 +231,10 @@
                         </select>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="taskDue">Due Date</label>
+                    <input type="date" id="taskDue">
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-secondary" onclick="closeTaskModal()">Cancel</button>
                     <button type="submit" class="btn-primary">Save Task</button>
@@ -265,16 +243,95 @@
         </div>
     </div>
 
+    <!-- Event Modal -->
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Event</h3>
+                <button class="btn-icon" onclick="closeEventModal()">✕</button>
+            </div>
+            <form id="eventForm" onsubmit="saveEvent(event)">
+                <input type="hidden" id="eventId">
+                <div class="form-group">
+                    <label for="eventTitle">Title</label>
+                    <input type="text" id="eventTitle" required placeholder="Event name">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="eventDate">Date</label>
+                        <input type="date" id="eventDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="eventTime">Time</label>
+                        <input type="time" id="eventTime">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="eventNotes">Notes</label>
+                    <textarea id="eventNotes" placeholder="Additional details..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeEventModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Theme Picker -->
+    <div class="modal" id="themePicker">
+        <div class="modal-content theme-picker-content">
+            <div class="modal-header">
+                <h3>🎨 Choose Theme</h3>
+                <button class="btn-icon" onclick="closeThemePicker()">✕</button>
+            </div>
+            <div class="theme-grid">
+                <button class="theme-option" onclick="setTheme('tokyo')" data-theme="tokyo">
+                    <span class="theme-preview tokyo"></span>
+                    <span>Tokyo Night</span>
+                </button>
+                <button class="theme-option" onclick="setTheme('dracula')" data-theme="dracula">
+                    <span class="theme-preview dracula"></span>
+                    <span>Dracula</span>
+                </button>
+                <button class="theme-option" onclick="setTheme('nord')" data-theme="nord">
+                    <span class="theme-preview nord"></span>
+                    <span>Nord</span>
+                </button>
+                <button class="theme-option" onclick="setTheme('light')" data-theme="light">
+                    <span class="theme-preview light"></span>
+                    <span>Light</span>
+                </button>
+                <button class="theme-option" onclick="setTheme('midnight')" data-theme="midnight">
+                    <span class="theme-preview midnight"></span>
+                    <span>Midnight</span>
+                </button>
+                <button class="theme-option" onclick="setTheme('forest')" data-theme="forest">
+                    <span class="theme-preview forest"></span>
+                    <span>Forest</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions FAB -->
+    <div class="fab-container">
+        <button class="fab" id="fabMain" onclick="toggleFabMenu()">⚡</button>
+        <div class="fab-menu" id="fabMenu">
+            <button class="fab-item" onclick="quickNewTask()">📋 New Task</button>
+            <button class="fab-item" onclick="quickNewEvent()">📆 New Event</button>
+            <button class="fab-item" onclick="quickChat()">💬 Quick Chat</button>
+            <button class="fab-item" onclick="openCommandPalette()">🎯 Commands</button>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="app.js"></script>
     <script>
-        // Register Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(() => console.log('SW registered'))
-                .catch((err) => console.log('SW registration failed:', err));
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
         }
     </script>
 </body>
