@@ -59,7 +59,13 @@ function json(data, status = 200, corsHeaders = {}) {
 
 // ============ CHAT ============
 async function handleChat(request, env, corsHeaders) {
-  const { message } = await request.json();
+  const { message, getHistory } = await request.json();
+  
+  // If just fetching history
+  if (getHistory && env.NOVA_KV) {
+    const history = await env.NOVA_KV.get('chat-history', 'json') || [];
+    return json({ history }, 200, corsHeaders);
+  }
   
   const gatewayUrl = env.GATEWAY_URL || 'https://gateway.beric.ca';
   const gatewayToken = env.GATEWAY_TOKEN;
@@ -68,16 +74,33 @@ async function handleChat(request, env, corsHeaders) {
     return json({ reply: "Gateway not configured." }, 200, corsHeaders);
   }
   
+  // Load existing history for context
+  let history = [];
+  if (env.NOVA_KV) {
+    history = await env.NOVA_KV.get('chat-history', 'json') || [];
+  }
+  
+  // Add user message to history
+  const userMsg = { role: 'user', content: message, timestamp: Date.now() };
+  history.push(userMsg);
+  
   try {
+    // Build messages with recent context (last 10 messages)
+    const contextMessages = history.slice(-10).map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: m.content
+    }));
+    
     const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${gatewayToken}`
+        'Authorization': `Bearer ${gatewayToken}`,
+        'x-clawdbot-session-key': 'portal:main'
       },
       body: JSON.stringify({
         model: 'clawdbot:main',
-        messages: [{ role: 'user', content: message }]
+        messages: contextMessages
       })
     });
     
@@ -86,8 +109,19 @@ async function handleChat(request, env, corsHeaders) {
     const data = await response.json();
     const reply = data.choices[0]?.message?.content || "No response.";
     
-    return json({ reply }, 200, corsHeaders);
+    // Add assistant reply to history
+    const assistantMsg = { role: 'assistant', content: reply, timestamp: Date.now() };
+    history.push(assistantMsg);
+    
+    // Save history (keep last 100 messages)
+    if (env.NOVA_KV) {
+      await env.NOVA_KV.put('chat-history', JSON.stringify(history.slice(-100)));
+    }
+    
+    return json({ reply, history: history.slice(-50) }, 200, corsHeaders);
   } catch (error) {
+    // Remove failed user message
+    history.pop();
     return json({ reply: `Connection error. Try again.` }, 200, corsHeaders);
   }
 }

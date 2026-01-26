@@ -51,6 +51,31 @@ const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
 const messagesContainer = document.getElementById('messages');
 
+// Load chat history on init
+async function loadChatHistory() {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ getHistory: true })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.history?.length) {
+        // Clear default message
+        if (messagesContainer) messagesContainer.innerHTML = '';
+        
+        // Show last 20 messages
+        data.history.slice(-20).forEach(msg => {
+          addMessage(msg.content, msg.role, new Date(msg.timestamp));
+        });
+        updateConnectionStatus(true);
+      }
+    }
+  } catch {}
+}
+
 chatForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const message = messageInput.value.trim();
@@ -85,16 +110,17 @@ chatForm?.addEventListener('submit', async (e) => {
   }
 });
 
-function addMessage(content, role) {
+function addMessage(content, role, timestamp = null) {
   const div = document.createElement('div');
   div.className = `message ${role}`;
   const avatar = role === 'user' ? '👤' : '✨';
+  const time = timestamp ? new Date(timestamp) : new Date();
   
   div.innerHTML = `
     <div class="message-avatar">${avatar}</div>
     <div class="message-body">
       <div class="message-content"><p>${formatMessage(content)}</p></div>
-      <span class="message-time">${formatTime(new Date())}</span>
+      <span class="message-time">${formatTime(time)}</span>
     </div>
   `;
   
@@ -575,6 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   initKanban();
   updateDashboard();
+  loadChatHistory();
   
   setInterval(updateDashboard, CONFIG.refreshInterval);
   
