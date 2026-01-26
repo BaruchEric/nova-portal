@@ -1,6 +1,6 @@
-// Nova Portal v3.0 - Full Featured
-// Command Palette, Projects, Calendar, Themes, Widgets
-// =====================================================
+// Nova Portal v3.1 - Complete Feature Set
+// Real-time Status, Widget Customization, Project Manager, Notifications
+// ======================================================================
 
 const CONFIG = {
   apiUrl: 'https://nova-portal-api.ericbaruch.workers.dev/api',
@@ -13,16 +13,44 @@ const CONFIG = {
 // ==================
 
 let currentProject = 'personal';
-let projects = {
-  personal: { name: '🏠 Personal', tasks: { todo: [], progress: [], done: [] } },
-  laundromat: { name: '🧺 Laundromat', tasks: { todo: [], progress: [], done: [] } },
-  'nova-dev': { name: '✨ Nova Dev', tasks: { todo: [], progress: [], done: [] } }
-};
+let projects = {};
 let events = [];
 let notes = [];
 let currentNote = null;
 let calendarDate = new Date();
-let widgets = ['gateway', 'portal', 'tasks-summary', 'recent-activity'];
+let widgets = { enabled: [], available: [] };
+let notifications = [];
+let statusData = null;
+
+// ==================
+// Initialize
+// ==================
+
+document.addEventListener('DOMContentLoaded', async () => {
+  loadTheme();
+  await Promise.all([
+    loadProjects(),
+    loadEvents(),
+    loadWidgets(),
+    loadNotifications(),
+    loadChatHistory()
+  ]);
+  
+  renderDashboard();
+  renderNotificationBadge();
+  
+  const initialView = location.hash.slice(1) || 'chat';
+  if (initialView !== 'chat') navigateTo(initialView);
+  
+  // Real-time status updates
+  updateStatus();
+  setInterval(updateStatus, CONFIG.refreshInterval);
+  
+  // Check for due reminders
+  setInterval(checkReminders, 60000);
+  
+  messageInput?.focus();
+});
 
 // ==================
 // Navigation
@@ -51,6 +79,25 @@ function navigateTo(viewId) {
 window.addEventListener('popstate', () => navigateTo(location.hash.slice(1) || 'chat'));
 
 // ==================
+// Real-time Status
+// ==================
+
+async function updateStatus() {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/status`);
+    if (response.ok) {
+      statusData = await response.json();
+      updateConnectionStatus(statusData.gateway?.status === 'Online');
+      if (document.getElementById('dashboard')?.classList.contains('active')) {
+        renderDashboard();
+      }
+    }
+  } catch {
+    updateConnectionStatus(false);
+  }
+}
+
+// ==================
 // Command Palette
 // ==================
 
@@ -60,10 +107,13 @@ const commands = [
   { id: 'tasks', icon: '📋', label: 'Go to Tasks', shortcut: '⌘3', action: () => navigateTo('tasks') },
   { id: 'calendar', icon: '📆', label: 'Go to Calendar', shortcut: '⌘4', action: () => navigateTo('calendar') },
   { id: 'notes', icon: '📝', label: 'Go to Notes', shortcut: '⌘5', action: () => navigateTo('notes') },
-  { id: 'new-task', icon: '➕', label: 'New Task', shortcut: '', action: () => { closeCommandPalette(); openTaskModal(); } },
-  { id: 'new-event', icon: '📅', label: 'New Event', shortcut: '', action: () => { closeCommandPalette(); openEventModal(); } },
-  { id: 'theme', icon: '🎨', label: 'Change Theme', shortcut: '', action: () => { closeCommandPalette(); openThemePicker(); } },
-  { id: 'refresh', icon: '🔄', label: 'Refresh All', shortcut: '', action: () => { location.reload(); } },
+  { id: 'new-task', icon: '➕', label: 'New Task', action: () => { closeCommandPalette(); openTaskModal(); } },
+  { id: 'new-event', icon: '📅', label: 'New Event', action: () => { closeCommandPalette(); openEventModal(); } },
+  { id: 'new-project', icon: '📁', label: 'New Project', action: () => { closeCommandPalette(); openProjectModal(); } },
+  { id: 'widgets', icon: '🧩', label: 'Customize Widgets', action: () => { closeCommandPalette(); openWidgetPicker(); } },
+  { id: 'theme', icon: '🎨', label: 'Change Theme', action: () => { closeCommandPalette(); openThemePicker(); } },
+  { id: 'notifications', icon: '🔔', label: 'View Notifications', action: () => { closeCommandPalette(); openNotifications(); } },
+  { id: 'refresh', icon: '🔄', label: 'Refresh All', action: () => location.reload() },
 ];
 
 let paletteIndex = 0;
@@ -87,7 +137,6 @@ function closeCommandPalette() {
 function renderPaletteResults() {
   const container = document.getElementById('paletteResults');
   if (!container) return;
-  
   container.innerHTML = filteredCommands.map((cmd, i) => `
     <div class="palette-item ${i === paletteIndex ? 'selected' : ''}" onclick="executeCommand('${cmd.id}')">
       <span class="icon">${cmd.icon}</span>
@@ -105,26 +154,14 @@ document.getElementById('paletteSearch')?.addEventListener('input', (e) => {
 });
 
 document.getElementById('paletteSearch')?.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    paletteIndex = Math.min(paletteIndex + 1, filteredCommands.length - 1);
-    renderPaletteResults();
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    paletteIndex = Math.max(paletteIndex - 1, 0);
-    renderPaletteResults();
-  } else if (e.key === 'Enter' && filteredCommands[paletteIndex]) {
-    e.preventDefault();
-    executeCommand(filteredCommands[paletteIndex].id);
-  }
+  if (e.key === 'ArrowDown') { e.preventDefault(); paletteIndex = Math.min(paletteIndex + 1, filteredCommands.length - 1); renderPaletteResults(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); paletteIndex = Math.max(paletteIndex - 1, 0); renderPaletteResults(); }
+  else if (e.key === 'Enter' && filteredCommands[paletteIndex]) { e.preventDefault(); executeCommand(filteredCommands[paletteIndex].id); }
 });
 
 function executeCommand(id) {
   const cmd = commands.find(c => c.id === id);
-  if (cmd) {
-    closeCommandPalette();
-    cmd.action();
-  }
+  if (cmd) { closeCommandPalette(); cmd.action(); }
 }
 
 // ==================
@@ -216,95 +253,253 @@ function formatMessage(text) {
 }
 
 // ==================
-// Dashboard Widgets
+// Dashboard & Widgets
 // ==================
+
+async function loadWidgets() {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/widgets`);
+    if (response.ok) {
+      widgets = await response.json();
+    }
+  } catch {}
+}
 
 function renderDashboard() {
   const grid = document.getElementById('dashboardGrid');
   if (!grid) return;
   
-  grid.innerHTML = widgets.map(w => renderWidget(w)).join('');
-  updateDashboard();
+  grid.innerHTML = widgets.enabled.map(id => renderWidget(id)).join('');
+  document.getElementById('lastUpdated').textContent = `Last updated: ${formatTime(new Date())}`;
 }
 
-function renderWidget(type) {
-  switch(type) {
-    case 'gateway':
-      return `<div class="widget" data-widget="gateway">
-        <div class="widget-header"><h3>🤖 Clawdbot Gateway</h3><span class="card-status" id="gw-status"></span></div>
-        <div class="stat"><span class="stat-value" id="gw-val">Checking...</span><span class="stat-label">Status</span></div>
+function renderWidget(id) {
+  const s = statusData || {};
+  const stats = s.stats || {};
+  
+  switch(id) {
+    case 'status-gateway':
+      return `<div class="widget" data-widget="${id}">
+        <div class="widget-header"><h3>🤖 Gateway</h3><span class="card-status ${s.gateway?.status === 'Online' ? 'online' : 'offline'}"></span></div>
+        <div class="widget-body">
+          <div class="stat"><span class="stat-value">${s.gateway?.status || 'Unknown'}</span><span class="stat-label">Status</span></div>
+          <div class="stat"><span class="stat-value">${s.gateway?.latency ? s.gateway.latency + 'ms' : '—'}</span><span class="stat-label">Latency</span></div>
+          <div class="stat"><span class="stat-value">${s.gateway?.agent || 'Unknown'}</span><span class="stat-label">Agent</span></div>
+        </div>
       </div>`;
-    case 'portal':
-      return `<div class="widget" data-widget="portal">
-        <div class="widget-header"><h3>✨ Nova Portal</h3><span class="card-status online"></span></div>
-        <div class="stat"><span class="stat-value">v3.0</span><span class="stat-label">Version</span></div>
+    case 'status-portal':
+      return `<div class="widget" data-widget="${id}">
+        <div class="widget-header"><h3>✨ Portal</h3><span class="card-status online"></span></div>
+        <div class="widget-body">
+          <div class="stat"><span class="stat-value">Online</span><span class="stat-label">Status</span></div>
+          <div class="stat"><span class="stat-value">v3.1</span><span class="stat-label">Version</span></div>
+        </div>
       </div>`;
-    case 'tasks-summary':
-      const total = Object.values(projects).reduce((sum, p) => sum + p.tasks.todo.length + p.tasks.progress.length, 0);
-      return `<div class="widget" data-widget="tasks-summary">
+    case 'status-tunnel':
+      return `<div class="widget" data-widget="${id}">
+        <div class="widget-header"><h3>🔗 Tunnel</h3><span class="card-status ${s.tunnel?.status === 'Connected' ? 'online' : 'offline'}"></span></div>
+        <div class="widget-body">
+          <div class="stat"><span class="stat-value">${s.tunnel?.status || 'Unknown'}</span><span class="stat-label">Status</span></div>
+        </div>
+      </div>`;
+    case 'stats-tasks':
+      return `<div class="widget" data-widget="${id}">
         <div class="widget-header"><h3>📋 Tasks</h3></div>
-        <div class="stat"><span class="stat-value">${total}</span><span class="stat-label">Active Tasks</span></div>
+        <div class="widget-body">
+          <div class="stat"><span class="stat-value">${stats.tasks?.todo || 0}</span><span class="stat-label">To Do</span></div>
+          <div class="stat"><span class="stat-value">${stats.tasks?.progress || 0}</span><span class="stat-label">In Progress</span></div>
+          <div class="stat"><span class="stat-value">${stats.tasks?.done || 0}</span><span class="stat-label">Done</span></div>
+        </div>
       </div>`;
-    case 'recent-activity':
-      return `<div class="widget" data-widget="recent-activity">
-        <div class="widget-header"><h3>⚡ Recent</h3></div>
-        <p style="color: var(--text-secondary); font-size: 0.9rem;">Chat & tasks synced</p>
+    case 'stats-activity':
+      return `<div class="widget widget-medium" data-widget="${id}">
+        <div class="widget-header"><h3>⚡ Activity</h3></div>
+        <div class="widget-body">
+          <p style="color:var(--text-secondary)">${stats.messages || 0} messages synced</p>
+          <p style="color:var(--text-secondary)">${stats.events || 0} upcoming events</p>
+        </div>
+      </div>`;
+    case 'stats-messages':
+      return `<div class="widget" data-widget="${id}">
+        <div class="widget-header"><h3>💬 Chat</h3></div>
+        <div class="widget-body">
+          <div class="stat"><span class="stat-value">${stats.messages || 0}</span><span class="stat-label">Messages</span></div>
+        </div>
+      </div>`;
+    case 'calendar-upcoming':
+      const upcoming = events.filter(e => new Date(e.date) >= new Date()).slice(0, 3);
+      return `<div class="widget widget-medium" data-widget="${id}">
+        <div class="widget-header"><h3>📆 Upcoming</h3></div>
+        <div class="widget-body">
+          ${upcoming.length ? upcoming.map(e => `<p style="color:var(--text-secondary)">• ${e.title} (${e.date})</p>`).join('') : '<p style="color:var(--text-muted)">No upcoming events</p>'}
+        </div>
+      </div>`;
+    case 'quick-actions':
+      return `<div class="widget" data-widget="${id}">
+        <div class="widget-header"><h3>🚀 Quick</h3></div>
+        <div class="widget-body" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn-secondary" onclick="quickNewTask()">+ Task</button>
+          <button class="btn-secondary" onclick="quickNewEvent()">+ Event</button>
+          <button class="btn-secondary" onclick="quickChat()">Chat</button>
+        </div>
       </div>`;
     default:
       return '';
   }
 }
 
-async function updateDashboard() {
-  try {
-    const response = await fetch(`${CONFIG.apiUrl}/status`);
-    if (response.ok) {
-      const data = await response.json();
-      const gwStatus = document.getElementById('gw-status');
-      const gwVal = document.getElementById('gw-val');
-      if (gwStatus) gwStatus.className = `card-status ${data.gateway?.status === 'Online' ? 'online' : 'offline'}`;
-      if (gwVal) gwVal.textContent = data.gateway?.status || 'Unknown';
-      document.getElementById('lastUpdated').textContent = `Last updated: ${formatTime(new Date())}`;
-      updateConnectionStatus(true);
-    }
-  } catch {
-    updateConnectionStatus(false);
-  }
+function openWidgetPicker() {
+  const modal = document.getElementById('widgetPicker');
+  renderWidgetPicker();
+  modal?.classList.add('open');
 }
 
-function refreshDashboard() { showToast('Refreshing...'); renderDashboard(); }
-function openWidgetPicker() { showToast('Widget picker coming soon!'); }
+function closeWidgetPicker() {
+  document.getElementById('widgetPicker')?.classList.remove('open');
+}
+
+function renderWidgetPicker() {
+  const container = document.getElementById('widgetList');
+  if (!container) return;
+  container.innerHTML = widgets.available.map(w => `
+    <label class="widget-option">
+      <input type="checkbox" ${widgets.enabled.includes(w.id) ? 'checked' : ''} onchange="toggleWidget('${w.id}')">
+      <span>${w.icon} ${w.name}</span>
+    </label>
+  `).join('');
+}
+
+async function toggleWidget(id) {
+  if (widgets.enabled.includes(id)) {
+    widgets.enabled = widgets.enabled.filter(w => w !== id);
+  } else {
+    widgets.enabled.push(id);
+  }
+  await fetch(`${CONFIG.apiUrl}/widgets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: widgets.enabled })
+  });
+  renderDashboard();
+  showToast('Widgets updated');
+}
+
+function refreshDashboard() { showToast('Refreshing...'); updateStatus(); }
 
 // ==================
-// Projects & Tasks
+// Projects
 // ==================
+
+async function loadProjects() {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/projects`);
+    if (response.ok) {
+      projects = await response.json();
+    }
+  } catch {}
+  
+  // Fallback
+  if (!Object.keys(projects).length) {
+    projects = {
+      personal: { name: '🏠 Personal', color: '#7aa2f7', tasks: { todo: [], progress: [], done: [] } },
+      laundromat: { name: '🧺 Laundromat', color: '#9ece6a', tasks: { todo: [], progress: [], done: [] } },
+      'nova-dev': { name: '✨ Nova Dev', color: '#bb9af7', tasks: { todo: [], progress: [], done: [] } }
+    };
+  }
+  
+  // Also load legacy tasks into personal
+  try {
+    const tasksRes = await fetch(`${CONFIG.apiUrl}/tasks`);
+    if (tasksRes.ok) {
+      const tasks = await tasksRes.json();
+      if (tasks.todo?.length || tasks.progress?.length || tasks.done?.length) {
+        projects.personal.tasks = tasks;
+      }
+    }
+  } catch {}
+  
+  renderProjectSelector();
+}
+
+function renderProjectSelector() {
+  const select = document.getElementById('projectSelect');
+  if (!select) return;
+  select.innerHTML = Object.entries(projects).map(([id, p]) => 
+    `<option value="${id}" ${id === currentProject ? 'selected' : ''}>${p.name}</option>`
+  ).join('');
+}
 
 function switchProject(projectId) {
   currentProject = projectId;
   renderTasks();
-  saveProjects();
 }
 
-function initProjects() {
-  const saved = localStorage.getItem(`${CONFIG.storagePrefix}projects`);
-  if (saved) projects = JSON.parse(saved);
-  loadTasksFromAPI();
+function openProjectModal(projectId = null) {
+  const modal = document.getElementById('projectModal');
+  document.getElementById('projectForm')?.reset();
+  document.getElementById('projectId').value = projectId || '';
+  document.getElementById('projectModalTitle').textContent = projectId ? 'Edit Project' : 'New Project';
+  
+  if (projectId && projects[projectId]) {
+    document.getElementById('projectName').value = projects[projectId].name.replace(/^[^\s]+\s/, '');
+    document.getElementById('projectIcon').value = projects[projectId].name.split(' ')[0];
+    document.getElementById('projectColor').value = projects[projectId].color || '#7aa2f7';
+  }
+  
+  modal?.classList.add('open');
 }
 
-async function loadTasksFromAPI() {
-  try {
-    const response = await fetch(`${CONFIG.apiUrl}/tasks`);
-    if (response.ok) {
-      const data = await response.json();
-      // Merge into personal project for backward compat
-      if (data.todo || data.progress || data.done) {
-        projects.personal.tasks = data;
-        saveProjects();
-        renderTasks();
-      }
-    }
-  } catch {}
+function closeProjectModal() {
+  document.getElementById('projectModal')?.classList.remove('open');
 }
+
+async function saveProject(e) {
+  e.preventDefault();
+  const id = document.getElementById('projectId').value || Date.now().toString();
+  const name = document.getElementById('projectName').value;
+  const icon = document.getElementById('projectIcon').value || '📁';
+  const color = document.getElementById('projectColor').value;
+  
+  if (!projects[id]) {
+    projects[id] = { tasks: { todo: [], progress: [], done: [] } };
+  }
+  projects[id].name = `${icon} ${name}`;
+  projects[id].color = color;
+  
+  await fetch(`${CONFIG.apiUrl}/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(projects)
+  });
+  
+  renderProjectSelector();
+  closeProjectModal();
+  showToast('Project saved');
+}
+
+async function deleteProject(id) {
+  if (!confirm('Delete this project and all its tasks?')) return;
+  delete projects[id];
+  if (currentProject === id) currentProject = 'personal';
+  
+  await fetch(`${CONFIG.apiUrl}/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(projects)
+  });
+  
+  renderProjectSelector();
+  renderTasks();
+  showToast('Project deleted');
+}
+
+function openProjectManager() {
+  openProjectModal();
+}
+
+// ==================
+// Tasks
+// ==================
 
 function renderTasks() {
   const project = projects[currentProject];
@@ -380,7 +575,7 @@ function handleDrop(e) {
   const [task] = project.tasks[fromStatus].splice(fromIndex, 1);
   project.tasks[toStatus].push(task);
   
-  saveProjects();
+  saveAllProjects();
   renderTasks();
   showToast(`Moved to ${toStatus}`);
 }
@@ -392,7 +587,7 @@ function openTaskModal(status = 'todo', index = null) {
   document.getElementById('modalTitle').textContent = 'Add Task';
   
   if (index !== null) {
-    const task = projects[currentProject].tasks[status]?.[index];
+    const task = projects[currentProject]?.tasks[status]?.[index];
     if (task) {
       document.getElementById('taskId').value = `${status}:${index}`;
       document.getElementById('taskTitle').value = task.title;
@@ -433,7 +628,7 @@ function saveTask(e) {
     showToast('Task created');
   }
   
-  saveProjects();
+  saveAllProjects();
   renderTasks();
   closeTaskModal();
 }
@@ -442,27 +637,40 @@ function editTask(status, index) { openTaskModal(status, index); }
 function deleteTask(status, index) {
   if (confirm('Delete this task?')) {
     projects[currentProject].tasks[status].splice(index, 1);
-    saveProjects();
+    saveAllProjects();
     renderTasks();
     showToast('Task deleted');
   }
 }
 
-function saveProjects() {
-  localStorage.setItem(`${CONFIG.storagePrefix}projects`, JSON.stringify(projects));
-  // Sync personal project to API
-  fetch(`${CONFIG.apiUrl}/tasks`, {
+async function saveAllProjects() {
+  // Save to projects endpoint
+  await fetch(`${CONFIG.apiUrl}/projects`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(projects.personal.tasks)
-  }).catch(() => {});
+    body: JSON.stringify(projects)
+  });
+  // Also save personal tasks to legacy endpoint
+  await fetch(`${CONFIG.apiUrl}/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(projects.personal?.tasks || { todo: [], progress: [], done: [] })
+  });
 }
 
-function openProjectManager() { showToast('Project manager coming soon!'); }
+// ==================
+// Calendar & Events
+// ==================
 
-// ==================
-// Calendar
-// ==================
+async function loadEvents() {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/events`);
+    if (response.ok) {
+      const data = await response.json();
+      events = data.events || [];
+    }
+  } catch {}
+}
 
 function renderCalendar() {
   const grid = document.getElementById('calendarGrid');
@@ -479,27 +687,18 @@ function renderCalendar() {
   const today = new Date();
   
   let html = '';
-  
-  // Previous month days
   const prevMonthDays = new Date(year, month, 0).getDate();
-  for (let i = firstDay - 1; i >= 0; i--) {
-    html += `<div class="calendar-day other-month">${prevMonthDays - i}</div>`;
-  }
+  for (let i = firstDay - 1; i >= 0; i--) html += `<div class="calendar-day other-month">${prevMonthDays - i}</div>`;
   
-  // Current month days
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
     const hasEvent = events.some(e => e.date === dateStr);
-    
     html += `<div class="calendar-day${isToday ? ' today' : ''}${hasEvent ? ' has-event' : ''}" onclick="selectDate('${dateStr}')">${day}</div>`;
   }
   
-  // Next month days
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
-  for (let i = 1; i <= totalCells - firstDay - daysInMonth; i++) {
-    html += `<div class="calendar-day other-month">${i}</div>`;
-  }
+  for (let i = 1; i <= totalCells - firstDay - daysInMonth; i++) html += `<div class="calendar-day other-month">${i}</div>`;
   
   grid.innerHTML = html;
   renderUpcomingEvents();
@@ -509,27 +708,19 @@ function renderUpcomingEvents() {
   const container = document.getElementById('upcomingEvents');
   if (!container) return;
   
-  const upcoming = events
-    .filter(e => new Date(e.date) >= new Date())
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .slice(0, 5);
+  const upcoming = events.filter(e => new Date(e.date) >= new Date()).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
   
-  if (upcoming.length === 0) {
+  if (!upcoming.length) {
     container.innerHTML = '<p style="color: var(--text-muted)">No upcoming events</p>';
     return;
   }
   
   container.innerHTML = upcoming.map(e => {
     const date = new Date(e.date);
-    return `<div class="event-item">
-      <div class="event-date">
-        <div class="day">${date.getDate()}</div>
-        <div class="month">${date.toLocaleDateString('en-US', { month: 'short' })}</div>
-      </div>
-      <div class="event-info">
-        <h4>${escapeHtml(e.title)}</h4>
-        ${e.time ? `<p>${e.time}</p>` : ''}
-      </div>
+    return `<div class="event-item" onclick="editEvent('${e.id}')">
+      <div class="event-date"><div class="day">${date.getDate()}</div><div class="month">${date.toLocaleDateString('en-US', { month: 'short' })}</div></div>
+      <div class="event-info"><h4>${escapeHtml(e.title)}</h4>${e.time ? `<p>${e.time}</p>` : ''}</div>
+      <button class="btn-icon-sm" onclick="event.stopPropagation(); deleteEvent('${e.id}')">🗑️</button>
     </div>`;
   }).join('');
 }
@@ -539,28 +730,165 @@ function nextMonth() { calendarDate.setMonth(calendarDate.getMonth() + 1); rende
 function goToToday() { calendarDate = new Date(); renderCalendar(); }
 function selectDate(dateStr) { document.getElementById('eventDate').value = dateStr; openEventModal(); }
 
-function openEventModal() { document.getElementById('eventModal')?.classList.add('open'); }
+function openEventModal(eventId = null) {
+  const modal = document.getElementById('eventModal');
+  document.getElementById('eventForm')?.reset();
+  document.getElementById('eventId').value = eventId || '';
+  
+  if (eventId) {
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      document.getElementById('eventTitle').value = event.title;
+      document.getElementById('eventDate').value = event.date;
+      document.getElementById('eventTime').value = event.time || '';
+      document.getElementById('eventNotes').value = event.notes || '';
+      document.getElementById('eventReminder').checked = event.reminder || false;
+    }
+  }
+  
+  modal?.classList.add('open');
+}
+
 function closeEventModal() { document.getElementById('eventModal')?.classList.remove('open'); }
 
-function saveEvent(e) {
+function editEvent(id) { openEventModal(id); }
+
+async function saveEvent(e) {
   e.preventDefault();
+  const id = document.getElementById('eventId').value || Date.now().toString();
   const event = {
-    id: Date.now().toString(),
+    id,
     title: document.getElementById('eventTitle').value,
     date: document.getElementById('eventDate').value,
     time: document.getElementById('eventTime').value,
-    notes: document.getElementById('eventNotes').value
+    notes: document.getElementById('eventNotes').value,
+    reminder: document.getElementById('eventReminder')?.checked || false
   };
-  events.push(event);
-  localStorage.setItem(`${CONFIG.storagePrefix}events`, JSON.stringify(events));
+  
+  const existingIndex = events.findIndex(e => e.id === id);
+  if (existingIndex >= 0) events[existingIndex] = event;
+  else events.push(event);
+  
+  await fetch(`${CONFIG.apiUrl}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ events })
+  });
+  
   closeEventModal();
   renderCalendar();
-  showToast('Event added');
+  showToast('Event saved');
+  
+  // Create notification for reminder
+  if (event.reminder) {
+    await createNotification(`📅 Reminder set for: ${event.title}`, 'reminder');
+  }
 }
 
-function loadEvents() {
-  const saved = localStorage.getItem(`${CONFIG.storagePrefix}events`);
-  if (saved) events = JSON.parse(saved);
+async function deleteEvent(id) {
+  events = events.filter(e => e.id !== id);
+  await fetch(`${CONFIG.apiUrl}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ events })
+  });
+  renderCalendar();
+  showToast('Event deleted');
+}
+
+// ==================
+// Notifications
+// ==================
+
+async function loadNotifications() {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/notifications`);
+    if (response.ok) {
+      const data = await response.json();
+      notifications = data.notifications || [];
+    }
+  } catch {}
+}
+
+function renderNotificationBadge() {
+  const unread = notifications.filter(n => !n.read).length;
+  const badge = document.getElementById('notificationBadge');
+  if (badge) {
+    badge.textContent = unread || '';
+    badge.style.display = unread ? 'flex' : 'none';
+  }
+}
+
+async function createNotification(message, type = 'info') {
+  const notification = { message, type, createdAt: Date.now(), read: false };
+  await fetch(`${CONFIG.apiUrl}/notifications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(notification)
+  });
+  await loadNotifications();
+  renderNotificationBadge();
+  
+  // Browser notification
+  if (Notification.permission === 'granted') {
+    new Notification('Nova Portal', { body: message, icon: '/icon.svg' });
+  }
+}
+
+function openNotifications() {
+  const modal = document.getElementById('notificationsModal');
+  renderNotificationsList();
+  modal?.classList.add('open');
+}
+
+function closeNotifications() {
+  document.getElementById('notificationsModal')?.classList.remove('open');
+}
+
+function renderNotificationsList() {
+  const container = document.getElementById('notificationsList');
+  if (!container) return;
+  
+  if (!notifications.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:2rem">No notifications</p>';
+    return;
+  }
+  
+  container.innerHTML = notifications.map(n => `
+    <div class="notification-item ${n.read ? '' : 'unread'}">
+      <span class="notification-icon">${n.type === 'reminder' ? '📅' : n.type === 'success' ? '✅' : 'ℹ️'}</span>
+      <div class="notification-content">
+        <p>${escapeHtml(n.message)}</p>
+        <span class="notification-time">${formatTimeAgo(n.createdAt)}</span>
+      </div>
+      <button class="btn-icon-sm" onclick="dismissNotification('${n.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+async function dismissNotification(id) {
+  await fetch(`${CONFIG.apiUrl}/notifications/${id}`, { method: 'DELETE' });
+  await loadNotifications();
+  renderNotificationBadge();
+  renderNotificationsList();
+}
+
+async function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+
+function checkReminders() {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const currentTime = now.toTimeString().slice(0, 5);
+  
+  events.forEach(event => {
+    if (event.reminder && event.date === todayStr && event.time === currentTime) {
+      createNotification(`⏰ ${event.title} is happening now!`, 'reminder');
+    }
+  });
 }
 
 // ==================
@@ -659,10 +987,7 @@ function loadTheme() {
 // FAB
 // ==================
 
-function toggleFabMenu() {
-  document.getElementById('fabMenu')?.classList.toggle('open');
-}
-
+function toggleFabMenu() { document.getElementById('fabMenu')?.classList.toggle('open'); }
 function quickNewTask() { toggleFabMenu(); navigateTo('tasks'); setTimeout(() => openTaskModal(), 100); }
 function quickNewEvent() { toggleFabMenu(); navigateTo('calendar'); setTimeout(() => openEventModal(), 100); }
 function quickChat() { toggleFabMenu(); navigateTo('chat'); messageInput?.focus(); }
@@ -699,59 +1024,46 @@ function formatTime(date) {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
+function formatTimeAgo(timestamp) {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 // ==================
 // Keyboard Shortcuts
 // ==================
 
 document.addEventListener('keydown', (e) => {
-  // Command palette
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault();
     document.getElementById('commandPalette')?.classList.contains('open') ? closeCommandPalette() : openCommandPalette();
   }
-  // Escape
   if (e.key === 'Escape') {
-    closeCommandPalette();
-    closeTaskModal();
-    closeEventModal();
-    closeThemePicker();
+    closeCommandPalette(); closeTaskModal(); closeEventModal(); closeThemePicker(); closeWidgetPicker(); closeProjectModal(); closeNotifications();
     document.getElementById('fabMenu')?.classList.remove('open');
   }
-  // View shortcuts
   if ((e.metaKey || e.ctrlKey) && ['1','2','3','4','5'].includes(e.key)) {
     e.preventDefault();
     navigateTo(['chat', 'dashboard', 'tasks', 'calendar', 'notes'][parseInt(e.key) - 1]);
   }
 });
 
-// Close modals on backdrop click
 document.querySelectorAll('.modal').forEach(modal => {
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.classList.remove('open');
-    }
-  });
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
 });
 
+// Request notification permission on load
+requestNotificationPermission();
+
 // ==================
-// Initialize
+// Global Functions
 // ==================
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadTheme();
-  loadEvents();
-  initProjects();
-  loadChatHistory();
-  renderDashboard();
-  
-  const initialView = location.hash.slice(1) || 'chat';
-  if (initialView !== 'chat') navigateTo(initialView);
-  
-  setInterval(updateDashboard, CONFIG.refreshInterval);
-  messageInput?.focus();
-});
-
-// Global functions
 window.openCommandPalette = openCommandPalette;
 window.closeCommandPalette = closeCommandPalette;
 window.executeCommand = executeCommand;
@@ -761,16 +1073,24 @@ window.saveTask = saveTask;
 window.editTask = editTask;
 window.deleteTask = deleteTask;
 window.switchProject = switchProject;
+window.openProjectModal = openProjectModal;
+window.closeProjectModal = closeProjectModal;
+window.saveProject = saveProject;
+window.deleteProject = deleteProject;
 window.openProjectManager = openProjectManager;
 window.openEventModal = openEventModal;
 window.closeEventModal = closeEventModal;
 window.saveEvent = saveEvent;
+window.editEvent = editEvent;
+window.deleteEvent = deleteEvent;
 window.selectDate = selectDate;
 window.prevMonth = prevMonth;
 window.nextMonth = nextMonth;
 window.goToToday = goToToday;
 window.refreshDashboard = refreshDashboard;
 window.openWidgetPicker = openWidgetPicker;
+window.closeWidgetPicker = closeWidgetPicker;
+window.toggleWidget = toggleWidget;
 window.refreshNotes = refreshNotes;
 window.saveNote = saveNote;
 window.copyNote = copyNote;
@@ -781,3 +1101,6 @@ window.toggleFabMenu = toggleFabMenu;
 window.quickNewTask = quickNewTask;
 window.quickNewEvent = quickNewEvent;
 window.quickChat = quickChat;
+window.openNotifications = openNotifications;
+window.closeNotifications = closeNotifications;
+window.dismissNotification = dismissNotification;

@@ -30,6 +30,9 @@
             </ul>
             <div class="sidebar-bottom">
                 <button class="btn-icon" onclick="openCommandPalette()" title="Command Palette (⌘K)">🎯</button>
+                <button class="btn-icon" onclick="openNotifications()" title="Notifications" style="position:relative">
+                    🔔<span class="notification-badge" id="notificationBadge"></span>
+                </button>
                 <button class="btn-icon" onclick="openThemePicker()" title="Themes">🎨</button>
             </div>
             <div class="sidebar-footer">
@@ -270,6 +273,12 @@
                     <label for="eventNotes">Notes</label>
                     <textarea id="eventNotes" placeholder="Additional details..."></textarea>
                 </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="eventReminder">
+                        <span>🔔 Remind me</span>
+                    </label>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn-secondary" onclick="closeEventModal()">Cancel</button>
                     <button type="submit" class="btn-primary">Save Event</button>
@@ -311,6 +320,62 @@
                     <span>Forest</span>
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Widget Picker -->
+    <div class="modal" id="widgetPicker">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🧩 Customize Widgets</h3>
+                <button class="btn-icon" onclick="closeWidgetPicker()">✕</button>
+            </div>
+            <div class="widget-picker-body" id="widgetList"></div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeWidgetPicker()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Modal -->
+    <div class="modal" id="projectModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="projectModalTitle">New Project</h3>
+                <button class="btn-icon" onclick="closeProjectModal()">✕</button>
+            </div>
+            <form id="projectForm" onsubmit="saveProject(event)">
+                <input type="hidden" id="projectId">
+                <div class="form-group">
+                    <label for="projectName">Project Name</label>
+                    <input type="text" id="projectName" required placeholder="My Project">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="projectIcon">Icon</label>
+                        <input type="text" id="projectIcon" placeholder="📁" maxlength="2">
+                    </div>
+                    <div class="form-group">
+                        <label for="projectColor">Color</label>
+                        <input type="color" id="projectColor" value="#7aa2f7">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeProjectModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div class="modal" id="notificationsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔔 Notifications</h3>
+                <button class="btn-icon" onclick="closeNotifications()">✕</button>
+            </div>
+            <div class="notifications-list" id="notificationsList"></div>
         </div>
     </div>
 

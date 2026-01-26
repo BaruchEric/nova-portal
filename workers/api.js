@@ -1,5 +1,6 @@
-// Nova Portal API - Cloudflare Worker
-// Full featured: Chat, Status, Tasks, Notes
+// Nova Portal API v3.1 - Full Featured Worker
+// Real-time status, widgets, projects, notifications
+// ================================================
 
 export default {
   async fetch(request, env, ctx) {
@@ -22,17 +23,41 @@ export default {
         return await handleChat(request, env, corsHeaders);
       }
       
-      // Status
+      // Real-time Status
       if (path === '/api/status') {
         return await handleStatus(env, corsHeaders);
       }
       
-      // Tasks (KV backed)
+      // Tasks
       if (path === '/api/tasks' && request.method === 'GET') {
         return await handleGetTasks(env, corsHeaders);
       }
       if (path === '/api/tasks' && request.method === 'POST') {
         return await handleSaveTasks(request, env, corsHeaders);
+      }
+      
+      // Projects
+      if (path === '/api/projects' && request.method === 'GET') {
+        return await handleGetProjects(env, corsHeaders);
+      }
+      if (path === '/api/projects' && request.method === 'POST') {
+        return await handleSaveProjects(request, env, corsHeaders);
+      }
+      
+      // Events/Calendar
+      if (path === '/api/events' && request.method === 'GET') {
+        return await handleGetEvents(env, corsHeaders);
+      }
+      if (path === '/api/events' && request.method === 'POST') {
+        return await handleSaveEvents(request, env, corsHeaders);
+      }
+      
+      // Widgets Config
+      if (path === '/api/widgets' && request.method === 'GET') {
+        return await handleGetWidgets(env, corsHeaders);
+      }
+      if (path === '/api/widgets' && request.method === 'POST') {
+        return await handleSaveWidgets(request, env, corsHeaders);
       }
       
       // Notes
@@ -41,6 +66,17 @@ export default {
       }
       if (path === '/api/notes' && request.method === 'POST') {
         return await handleSaveNote(request, env, corsHeaders);
+      }
+      
+      // Notifications
+      if (path === '/api/notifications' && request.method === 'GET') {
+        return await handleGetNotifications(env, corsHeaders);
+      }
+      if (path === '/api/notifications' && request.method === 'POST') {
+        return await handleSaveNotification(request, env, corsHeaders);
+      }
+      if (path.startsWith('/api/notifications/') && request.method === 'DELETE') {
+        return await handleDeleteNotification(request, path, env, corsHeaders);
       }
       
       return json({ error: 'Not Found' }, 404, corsHeaders);
@@ -61,7 +97,6 @@ function json(data, status = 200, corsHeaders = {}) {
 async function handleChat(request, env, corsHeaders) {
   const { message, getHistory } = await request.json();
   
-  // If just fetching history
   if (getHistory && env.NOVA_KV) {
     const history = await env.NOVA_KV.get('chat-history', 'json') || [];
     return json({ history }, 200, corsHeaders);
@@ -74,18 +109,15 @@ async function handleChat(request, env, corsHeaders) {
     return json({ reply: "Gateway not configured." }, 200, corsHeaders);
   }
   
-  // Load existing history for context
   let history = [];
   if (env.NOVA_KV) {
     history = await env.NOVA_KV.get('chat-history', 'json') || [];
   }
   
-  // Add user message to history
   const userMsg = { role: 'user', content: message, timestamp: Date.now() };
   history.push(userMsg);
   
   try {
-    // Build messages with recent context (last 10 messages)
     const contextMessages = history.slice(-10).map(m => ({
       role: m.role === 'user' ? 'user' : 'assistant',
       content: m.content
@@ -109,44 +141,52 @@ async function handleChat(request, env, corsHeaders) {
     const data = await response.json();
     const reply = data.choices[0]?.message?.content || "No response.";
     
-    // Add assistant reply to history
     const assistantMsg = { role: 'assistant', content: reply, timestamp: Date.now() };
     history.push(assistantMsg);
     
-    // Save history (keep last 100 messages)
     if (env.NOVA_KV) {
       await env.NOVA_KV.put('chat-history', JSON.stringify(history.slice(-100)));
     }
     
     return json({ reply, history: history.slice(-50) }, 200, corsHeaders);
   } catch (error) {
-    // Remove failed user message
     history.pop();
     return json({ reply: `Connection error. Try again.` }, 200, corsHeaders);
   }
 }
 
-// ============ STATUS ============
+// ============ REAL-TIME STATUS ============
 async function handleStatus(env, corsHeaders) {
   const gatewayUrl = env.GATEWAY_URL || 'https://gateway.beric.ca';
   const gatewayToken = env.GATEWAY_TOKEN;
   
-  let gatewayStatus = 'Unknown';
-  let agentStatus = 'Unknown';
+  const status = {
+    timestamp: Date.now(),
+    gateway: { status: 'Unknown', latency: null, agent: 'Unknown' },
+    tunnel: { status: 'Unknown', endpoint: gatewayUrl },
+    portal: { status: 'Online', version: '3.1', uptime: Date.now() },
+    services: {}
+  };
   
-  // Check gateway health
+  // Check Gateway health
+  const gwStart = Date.now();
   try {
     const healthRes = await fetch(`${gatewayUrl}/health`, { 
       signal: AbortSignal.timeout(5000) 
     });
-    gatewayStatus = healthRes.ok ? 'Online' : 'Error';
-  } catch {
-    gatewayStatus = 'Offline';
+    status.gateway.latency = Date.now() - gwStart;
+    status.gateway.status = healthRes.ok ? 'Online' : 'Error';
+    status.tunnel.status = 'Connected';
+  } catch (e) {
+    status.gateway.status = 'Offline';
+    status.gateway.latency = null;
+    status.tunnel.status = 'Disconnected';
   }
   
-  // Get agent info via chat completions test
-  if (gatewayStatus === 'Online' && gatewayToken) {
+  // Check Agent availability
+  if (status.gateway.status === 'Online' && gatewayToken) {
     try {
+      const agentStart = Date.now();
       const testRes = await fetch(`${gatewayUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
@@ -155,30 +195,36 @@ async function handleStatus(env, corsHeaders) {
         },
         body: JSON.stringify({
           model: 'clawdbot:main',
-          max_tokens: 10,
+          max_tokens: 5,
           messages: [{ role: 'user', content: 'ping' }]
         }),
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(15000)
       });
-      agentStatus = testRes.ok ? 'Online' : 'Error';
+      status.gateway.agent = testRes.ok ? 'Ready' : 'Busy';
+      status.gateway.agentLatency = Date.now() - agentStart;
     } catch {
-      agentStatus = 'Busy';
+      status.gateway.agent = 'Busy';
     }
   }
   
-  const status = {
-    gateway: {
-      status: gatewayStatus,
-      url: gatewayUrl,
-      agent: agentStatus
-    },
-    portal: {
-      status: 'Online',
-      version: '2.0',
-      features: ['chat', 'dashboard', 'tasks', 'notes']
-    },
-    timestamp: new Date().toISOString()
-  };
+  // Get stats from KV
+  if (env.NOVA_KV) {
+    try {
+      const tasks = await env.NOVA_KV.get('tasks', 'json');
+      const events = await env.NOVA_KV.get('events', 'json');
+      const chat = await env.NOVA_KV.get('chat-history', 'json');
+      
+      status.stats = {
+        tasks: {
+          todo: tasks?.todo?.length || 0,
+          progress: tasks?.progress?.length || 0,
+          done: tasks?.done?.length || 0
+        },
+        events: events?.length || 0,
+        messages: chat?.length || 0
+      };
+    } catch {}
+  }
   
   return json(status, 200, corsHeaders);
 }
@@ -186,24 +232,88 @@ async function handleStatus(env, corsHeaders) {
 // ============ TASKS ============
 async function handleGetTasks(env, corsHeaders) {
   let tasks = { todo: [], progress: [], done: [] };
-  
   if (env.NOVA_KV) {
-    try {
-      const stored = await env.NOVA_KV.get('tasks', 'json');
-      if (stored) tasks = stored;
-    } catch {}
+    const stored = await env.NOVA_KV.get('tasks', 'json');
+    if (stored) tasks = stored;
   }
-  
   return json(tasks, 200, corsHeaders);
 }
 
 async function handleSaveTasks(request, env, corsHeaders) {
   const tasks = await request.json();
-  
   if (env.NOVA_KV) {
     await env.NOVA_KV.put('tasks', JSON.stringify(tasks));
   }
-  
+  return json({ success: true }, 200, corsHeaders);
+}
+
+// ============ PROJECTS ============
+async function handleGetProjects(env, corsHeaders) {
+  let projects = {
+    personal: { name: '🏠 Personal', color: '#7aa2f7', tasks: { todo: [], progress: [], done: [] } },
+    laundromat: { name: '🧺 Laundromat', color: '#9ece6a', tasks: { todo: [], progress: [], done: [] } },
+    'nova-dev': { name: '✨ Nova Dev', color: '#bb9af7', tasks: { todo: [], progress: [], done: [] } }
+  };
+  if (env.NOVA_KV) {
+    const stored = await env.NOVA_KV.get('projects', 'json');
+    if (stored) projects = stored;
+  }
+  return json(projects, 200, corsHeaders);
+}
+
+async function handleSaveProjects(request, env, corsHeaders) {
+  const projects = await request.json();
+  if (env.NOVA_KV) {
+    await env.NOVA_KV.put('projects', JSON.stringify(projects));
+  }
+  return json({ success: true }, 200, corsHeaders);
+}
+
+// ============ EVENTS ============
+async function handleGetEvents(env, corsHeaders) {
+  let events = [];
+  if (env.NOVA_KV) {
+    const stored = await env.NOVA_KV.get('events', 'json');
+    if (stored) events = stored;
+  }
+  return json({ events }, 200, corsHeaders);
+}
+
+async function handleSaveEvents(request, env, corsHeaders) {
+  const { events } = await request.json();
+  if (env.NOVA_KV) {
+    await env.NOVA_KV.put('events', JSON.stringify(events));
+  }
+  return json({ success: true }, 200, corsHeaders);
+}
+
+// ============ WIDGETS ============
+async function handleGetWidgets(env, corsHeaders) {
+  let widgets = {
+    enabled: ['status-gateway', 'status-portal', 'stats-tasks', 'stats-activity'],
+    available: [
+      { id: 'status-gateway', name: 'Gateway Status', icon: '🤖', size: 'small' },
+      { id: 'status-portal', name: 'Portal Status', icon: '✨', size: 'small' },
+      { id: 'status-tunnel', name: 'Tunnel Status', icon: '🔗', size: 'small' },
+      { id: 'stats-tasks', name: 'Task Summary', icon: '📋', size: 'small' },
+      { id: 'stats-activity', name: 'Recent Activity', icon: '⚡', size: 'medium' },
+      { id: 'stats-messages', name: 'Chat Stats', icon: '💬', size: 'small' },
+      { id: 'calendar-upcoming', name: 'Upcoming Events', icon: '📆', size: 'medium' },
+      { id: 'quick-actions', name: 'Quick Actions', icon: '🚀', size: 'small' }
+    ]
+  };
+  if (env.NOVA_KV) {
+    const stored = await env.NOVA_KV.get('widgets', 'json');
+    if (stored) widgets.enabled = stored.enabled || widgets.enabled;
+  }
+  return json(widgets, 200, corsHeaders);
+}
+
+async function handleSaveWidgets(request, env, corsHeaders) {
+  const { enabled } = await request.json();
+  if (env.NOVA_KV) {
+    await env.NOVA_KV.put('widgets', JSON.stringify({ enabled }));
+  }
   return json({ success: true }, 200, corsHeaders);
 }
 
@@ -212,7 +322,6 @@ async function handleGetNotes(request, env, corsHeaders) {
   const url = new URL(request.url);
   const fileId = url.searchParams.get('file');
   
-  // List available notes
   if (!fileId) {
     const today = new Date().toISOString().split('T')[0];
     const notes = [
@@ -226,7 +335,6 @@ async function handleGetNotes(request, env, corsHeaders) {
     return json({ notes }, 200, corsHeaders);
   }
   
-  // Get note content via Nova
   const gatewayUrl = env.GATEWAY_URL || 'https://gateway.beric.ca';
   const gatewayToken = env.GATEWAY_TOKEN;
   
@@ -234,7 +342,6 @@ async function handleGetNotes(request, env, corsHeaders) {
     return json({ content: 'Gateway not configured.' }, 200, corsHeaders);
   }
   
-  // Map file ID to actual path
   const fileMap = {
     'memory': 'MEMORY.md',
     'soul': 'SOUL.md', 
@@ -263,7 +370,7 @@ async function handleGetNotes(request, env, corsHeaders) {
         model: 'clawdbot:main',
         messages: [{ 
           role: 'user', 
-          content: `Read the file "${filePath}" and return ONLY its raw contents. No commentary, no formatting, just the exact file contents.`
+          content: `Read the file "${filePath}" and return ONLY its raw contents. No commentary.`
         }]
       })
     });
@@ -275,7 +382,7 @@ async function handleGetNotes(request, env, corsHeaders) {
     
     return json({ content, path: filePath }, 200, corsHeaders);
   } catch (error) {
-    return json({ content: `Error reading file: ${error.message}` }, 200, corsHeaders);
+    return json({ content: `Error: ${error.message}` }, 200, corsHeaders);
   }
 }
 
@@ -307,7 +414,7 @@ async function handleSaveNote(request, env, corsHeaders) {
   }
   
   try {
-    const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
+    await fetch(`${gatewayUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -317,15 +424,52 @@ async function handleSaveNote(request, env, corsHeaders) {
         model: 'clawdbot:main',
         messages: [{ 
           role: 'user', 
-          content: `Write the following content to the file "${filePath}" (overwrite existing):\n\n${content}\n\nConfirm when done.`
+          content: `Write this content to "${filePath}":\n\n${content}\n\nConfirm when done.`
         }]
       })
     });
-    
-    if (!response.ok) throw new Error('Failed to save');
     
     return json({ success: true, path: filePath }, 200, corsHeaders);
   } catch (error) {
     return json({ success: false, error: error.message }, 200, corsHeaders);
   }
+}
+
+// ============ NOTIFICATIONS ============
+async function handleGetNotifications(env, corsHeaders) {
+  let notifications = [];
+  if (env.NOVA_KV) {
+    const stored = await env.NOVA_KV.get('notifications', 'json');
+    if (stored) notifications = stored;
+  }
+  return json({ notifications }, 200, corsHeaders);
+}
+
+async function handleSaveNotification(request, env, corsHeaders) {
+  const notification = await request.json();
+  notification.id = notification.id || Date.now().toString();
+  notification.createdAt = notification.createdAt || Date.now();
+  notification.read = false;
+  
+  let notifications = [];
+  if (env.NOVA_KV) {
+    notifications = await env.NOVA_KV.get('notifications', 'json') || [];
+    notifications.unshift(notification);
+    notifications = notifications.slice(0, 50); // Keep last 50
+    await env.NOVA_KV.put('notifications', JSON.stringify(notifications));
+  }
+  
+  return json({ success: true, notification }, 200, corsHeaders);
+}
+
+async function handleDeleteNotification(request, path, env, corsHeaders) {
+  const id = path.split('/').pop();
+  
+  if (env.NOVA_KV) {
+    let notifications = await env.NOVA_KV.get('notifications', 'json') || [];
+    notifications = notifications.filter(n => n.id !== id);
+    await env.NOVA_KV.put('notifications', JSON.stringify(notifications));
+  }
+  
+  return json({ success: true }, 200, corsHeaders);
 }
