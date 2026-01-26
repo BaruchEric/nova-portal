@@ -1,0 +1,19 @@
+name = "nova-portal-api"
+main = "api.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace for task persistence
+# Uncomment after creating: wrangler kv:namespace create "NOVA_KV"
+# [[kv_namespaces]]
+# binding = "NOVA_KV"
+# id = "your-kv-namespace-id"
+
+[vars]
+# Set these in Cloudflare dashboard for security
+# CLAWDBOT_GATEWAY_URL = "https://your-gateway.example.com"
+# CLAWDBOT_GATEWAY_TOKEN = "your-token"
+
+# Routes (configure after deployment)
+# routes = [
+#   { pattern = "beric.ca/api/*", zone_name = "beric.ca" }
+# ]

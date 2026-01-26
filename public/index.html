@@ -22,8 +22,8 @@
                 <li><a href="#notes" class="nav-link" data-view="notes">📝 Notes</a></li>
             </ul>
             <div class="sidebar-footer">
-                <div class="status-indicator online"></div>
-                <span>Connected</span>
+                <div class="status-indicator" id="connectionStatus"></div>
+                <span id="connectionText">Connecting...</span>
             </div>
         </nav>
 
@@ -38,15 +38,22 @@
                 <div class="chat-container">
                     <div class="messages" id="messages">
                         <div class="message assistant">
-                            <div class="message-content">
-                                <p>Hey! I'm Nova. What can I help you with?</p>
+                            <div class="message-avatar">✨</div>
+                            <div class="message-body">
+                                <div class="message-content">
+                                    <p>Hey Eric! I'm Nova. What can I help you with?</p>
+                                </div>
+                                <span class="message-time">Just now</span>
                             </div>
-                            <span class="message-time">Just now</span>
                         </div>
                     </div>
                     <form class="chat-input" id="chatForm">
                         <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
-                        <button type="submit">Send</button>
+                        <button type="submit" id="sendBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
+                            </svg>
+                        </button>
                     </form>
                 </div>
             </div>
@@ -56,44 +63,84 @@
                 <header class="view-header">
                     <h1>Dashboard</h1>
                     <span class="subtitle">System overview</span>
+                    <button class="btn-secondary" onclick="refreshDashboard()">🔄 Refresh</button>
                 </header>
                 <div class="dashboard-grid">
                     <div class="card">
-                        <h3>🖥️ Local VM</h3>
-                        <div class="stat">
-                            <span class="stat-value" id="vm-status">Online</span>
-                            <span class="stat-label">Status</span>
+                        <div class="card-header">
+                            <h3>🖥️ Local VM</h3>
+                            <span class="card-status online" id="vm-indicator"></span>
                         </div>
-                        <div class="stat">
-                            <span class="stat-value" id="vm-cpu">6 cores</span>
-                            <span class="stat-label">CPU</span>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <h3>☁️ EC2 Instance</h3>
-                        <div class="stat">
-                            <span class="stat-value" id="ec2-status">Online</span>
-                            <span class="stat-label">Status</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-value" id="ec2-disk">70%</span>
-                            <span class="stat-label">Disk Used</span>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <span class="stat-value" id="vm-status">Online</span>
+                                <span class="stat-label">Status</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="vm-cpu">6 cores</span>
+                                <span class="stat-label">CPU</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="vm-memory">8GB</span>
+                                <span class="stat-label">Memory</span>
+                            </div>
                         </div>
                     </div>
                     <div class="card">
-                        <h3>🌐 Network</h3>
-                        <div class="stat">
-                            <span class="stat-value" id="tailscale-devices">3</span>
-                            <span class="stat-label">Tailscale Devices</span>
+                        <div class="card-header">
+                            <h3>☁️ EC2 Instance</h3>
+                            <span class="card-status online" id="ec2-indicator"></span>
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <span class="stat-value" id="ec2-status">Online</span>
+                                <span class="stat-label">Status</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="ec2-disk">70%</span>
+                                <span class="stat-label">Disk Used</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="ec2-ip">54.67.100.74</span>
+                                <span class="stat-label">IP Address</span>
+                            </div>
                         </div>
                     </div>
                     <div class="card">
-                        <h3>📧 Gmail</h3>
-                        <div class="stat">
-                            <span class="stat-value" id="email-unread">0</span>
-                            <span class="stat-label">Unread</span>
+                        <div class="card-header">
+                            <h3>🌐 Tailscale</h3>
+                            <span class="card-status online" id="ts-indicator"></span>
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <span class="stat-value" id="tailscale-devices">3</span>
+                                <span class="stat-label">Devices</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="tailscale-status">Connected</span>
+                                <span class="stat-label">Status</span>
+                            </div>
                         </div>
                     </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📧 Gmail</h3>
+                            <span class="card-status" id="email-indicator"></span>
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat">
+                                <span class="stat-value" id="email-unread">0</span>
+                                <span class="stat-label">Unread</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="email-account">novasinclair16</span>
+                                <span class="stat-label">Account</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-footer">
+                    <span id="lastUpdated">Last updated: Never</span>
                 </div>
             </div>
 
@@ -102,37 +149,29 @@
                 <header class="view-header">
                     <h1>Tasks</h1>
                     <span class="subtitle">Kanban board</span>
-                    <button class="btn-primary" onclick="addTask()">+ Add Task</button>
+                    <button class="btn-primary" onclick="openTaskModal()">+ Add Task</button>
                 </header>
                 <div class="kanban-board">
                     <div class="kanban-column" data-status="todo">
-                        <h3>📥 To Do</h3>
-                        <div class="kanban-cards" id="todo-cards">
-                            <div class="kanban-card" draggable="true">
-                                <h4>Example Task</h4>
-                                <p>This is a sample task</p>
-                                <span class="card-tag">setup</span>
-                            </div>
+                        <div class="column-header">
+                            <h3>📥 To Do</h3>
+                            <span class="task-count" id="todo-count">0</span>
                         </div>
+                        <div class="kanban-cards" id="todo-cards"></div>
                     </div>
                     <div class="kanban-column" data-status="progress">
-                        <h3>🔄 In Progress</h3>
+                        <div class="column-header">
+                            <h3>🔄 In Progress</h3>
+                            <span class="task-count" id="progress-count">0</span>
+                        </div>
                         <div class="kanban-cards" id="progress-cards"></div>
                     </div>
                     <div class="kanban-column" data-status="done">
-                        <h3>✅ Done</h3>
-                        <div class="kanban-cards" id="done-cards">
-                            <div class="kanban-card" draggable="true">
-                                <h4>Set up VM</h4>
-                                <p>Created Nova's home</p>
-                                <span class="card-tag">infra</span>
-                            </div>
-                            <div class="kanban-card" draggable="true">
-                                <h4>Configure tools</h4>
-                                <p>Installed dev tools</p>
-                                <span class="card-tag">setup</span>
-                            </div>
+                        <div class="column-header">
+                            <h3>✅ Done</h3>
+                            <span class="task-count" id="done-count">0</span>
                         </div>
+                        <div class="kanban-cards" id="done-cards"></div>
                     </div>
                 </div>
             </div>
@@ -142,25 +181,87 @@
                 <header class="view-header">
                     <h1>Notes</h1>
                     <span class="subtitle">Memory and logs</span>
+                    <button class="btn-secondary" onclick="refreshNotes()">🔄 Refresh</button>
                 </header>
                 <div class="notes-container">
-                    <div class="notes-list">
-                        <div class="note-item active">
-                            <h4>2026-01-25</h4>
-                            <p>Day One - Birth of Nova</p>
+                    <div class="notes-sidebar">
+                        <div class="notes-section">
+                            <h4>📅 Daily Notes</h4>
+                            <div class="notes-list" id="daily-notes"></div>
                         </div>
-                        <div class="note-item">
-                            <h4>MEMORY.md</h4>
-                            <p>Long-term memory</p>
+                        <div class="notes-section">
+                            <h4>🧠 Memory</h4>
+                            <div class="notes-list" id="memory-notes"></div>
+                        </div>
+                        <div class="notes-section">
+                            <h4>⚙️ Config</h4>
+                            <div class="notes-list" id="config-notes"></div>
                         </div>
                     </div>
-                    <div class="note-content">
-                        <textarea id="noteEditor" placeholder="Select a note to view..."></textarea>
+                    <div class="note-editor">
+                        <div class="editor-header">
+                            <h3 id="noteTitle">Select a note</h3>
+                            <div class="editor-actions">
+                                <button class="btn-icon" onclick="saveNote()" title="Save">💾</button>
+                                <button class="btn-icon" onclick="copyNote()" title="Copy">📋</button>
+                            </div>
+                        </div>
+                        <textarea id="noteContent" placeholder="Select a note to view..." readonly></textarea>
                     </div>
                 </div>
             </div>
         </main>
     </div>
+
+    <!-- Task Modal -->
+    <div class="modal" id="taskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add Task</h3>
+                <button class="btn-icon" onclick="closeTaskModal()">✕</button>
+            </div>
+            <form id="taskForm" onsubmit="saveTask(event)">
+                <input type="hidden" id="taskId">
+                <div class="form-group">
+                    <label for="taskTitle">Title</label>
+                    <input type="text" id="taskTitle" required placeholder="What needs to be done?">
+                </div>
+                <div class="form-group">
+                    <label for="taskDescription">Description</label>
+                    <textarea id="taskDescription" placeholder="Add details..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taskTag">Tag</label>
+                        <select id="taskTag">
+                            <option value="task">🏷️ task</option>
+                            <option value="feature">✨ feature</option>
+                            <option value="bug">🐛 bug</option>
+                            <option value="infra">🔧 infra</option>
+                            <option value="docs">📝 docs</option>
+                            <option value="urgent">🔥 urgent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskPriority">Priority</label>
+                        <select id="taskPriority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeTaskModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <script src="app.js"></script>
 </body>
 </html>
