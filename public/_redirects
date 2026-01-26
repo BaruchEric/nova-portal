@@ -1,0 +1,7 @@
+# Cloudflare Pages Redirects
+
+# API proxy to Worker
+/api/*  https://nova-portal-api.ericbaruch.workers.dev/api/:splat  200
+
+# SPA fallback
+/*  /index.html  200
