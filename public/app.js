@@ -1,10 +1,11 @@
 // Nova Portal - Full Featured JavaScript
+// v2.0 - Connected to Nova via Clawdbot Gateway
 // ======================================
 
 // Configuration
 const CONFIG = {
-  apiUrl: '/api', // Will be proxied to Cloudflare Worker
-  refreshInterval: 30000, // 30 seconds
+  apiUrl: 'https://nova-portal-api.ericbaruch.workers.dev/api',
+  refreshInterval: 30000,
   storagePrefix: 'nova-'
 };
 
@@ -12,7 +13,6 @@ const CONFIG = {
 let tasks = { todo: [], progress: [], done: [] };
 let notes = [];
 let currentNote = null;
-let isConnected = false;
 
 // ==================
 // Navigation
@@ -21,32 +21,26 @@ let isConnected = false;
 document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', (e) => {
     e.preventDefault();
-    const viewId = link.getAttribute('data-view');
-    navigateTo(viewId);
+    navigateTo(link.getAttribute('data-view'));
   });
 });
 
 function navigateTo(viewId) {
-  // Update nav
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  document.querySelector(`[data-view="${viewId}"]`).classList.add('active');
+  document.querySelector(`[data-view="${viewId}"]`)?.classList.add('active');
   
-  // Update view
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById(viewId).classList.add('active');
+  document.getElementById(viewId)?.classList.add('active');
   
-  // Update URL
   history.pushState(null, '', `#${viewId}`);
   
-  // View-specific init
   if (viewId === 'dashboard') updateDashboard();
   if (viewId === 'notes') loadNotes();
+  if (viewId === 'tasks') renderTasks();
 }
 
-// Handle back/forward
 window.addEventListener('popstate', () => {
-  const viewId = location.hash.slice(1) || 'chat';
-  navigateTo(viewId);
+  navigateTo(location.hash.slice(1) || 'chat');
 });
 
 // ==================
@@ -57,17 +51,15 @@ const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
 const messagesContainer = document.getElementById('messages');
 
-chatForm.addEventListener('submit', async (e) => {
+chatForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const message = messageInput.value.trim();
   if (!message) return;
   
-  // Add user message
   addMessage(message, 'user');
   messageInput.value = '';
   messageInput.focus();
   
-  // Show typing indicator
   const typingEl = showTyping();
   
   try {
@@ -88,7 +80,7 @@ chatForm.addEventListener('submit', async (e) => {
     }
   } catch (error) {
     removeTyping(typingEl);
-    addMessage("Having trouble connecting. I'll keep trying! ✨", 'assistant');
+    addMessage("Connection issue. Try again! ✨", 'assistant');
     updateConnectionStatus(false);
   }
 });
@@ -96,20 +88,17 @@ chatForm.addEventListener('submit', async (e) => {
 function addMessage(content, role) {
   const div = document.createElement('div');
   div.className = `message ${role}`;
-  
   const avatar = role === 'user' ? '👤' : '✨';
   
   div.innerHTML = `
     <div class="message-avatar">${avatar}</div>
     <div class="message-body">
-      <div class="message-content">
-        <p>${formatMessage(content)}</p>
-      </div>
+      <div class="message-content"><p>${formatMessage(content)}</p></div>
       <span class="message-time">${formatTime(new Date())}</span>
     </div>
   `;
   
-  messagesContainer.appendChild(div);
+  messagesContainer?.appendChild(div);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -120,23 +109,20 @@ function showTyping() {
     <div class="message-avatar">✨</div>
     <div class="message-body">
       <div class="message-content">
-        <div class="typing-indicator">
-          <span></span><span></span><span></span>
-        </div>
+        <div class="typing-indicator"><span></span><span></span><span></span></div>
       </div>
     </div>
   `;
-  messagesContainer.appendChild(div);
+  messagesContainer?.appendChild(div);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
   return div;
 }
 
 function removeTyping(el) {
-  if (el && el.parentNode) el.remove();
+  el?.remove();
 }
 
 function formatMessage(text) {
-  // Basic markdown-like formatting
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -149,35 +135,43 @@ function formatMessage(text) {
 // ==================
 
 async function updateDashboard() {
+  const statusCard = document.getElementById('vm-status');
+  if (statusCard) statusCard.textContent = 'Checking...';
+  
   try {
     const response = await fetch(`${CONFIG.apiUrl}/status`);
     
     if (response.ok) {
       const data = await response.json();
       
-      // VM Status
-      document.getElementById('vm-status').textContent = data.vm?.status || 'Unknown';
-      document.getElementById('vm-cpu').textContent = data.vm?.cpu || 'N/A';
-      document.getElementById('vm-memory').textContent = data.vm?.memory || 'N/A';
-      updateIndicator('vm-indicator', data.vm?.status === 'Online');
+      // Gateway status
+      const gwStatus = document.getElementById('vm-status');
+      const gwCpu = document.getElementById('vm-cpu');
+      const gwMem = document.getElementById('vm-memory');
+      if (gwStatus) gwStatus.textContent = data.gateway?.status || 'Unknown';
+      if (gwCpu) gwCpu.textContent = data.gateway?.agent || 'Unknown';
+      if (gwMem) gwMem.textContent = data.gateway?.url?.replace('https://', '') || 'N/A';
+      updateIndicator('vm-indicator', data.gateway?.status === 'Online');
       
-      // EC2 Status
-      document.getElementById('ec2-status').textContent = data.ec2?.status || 'Unknown';
-      document.getElementById('ec2-disk').textContent = data.ec2?.disk || 'N/A';
-      document.getElementById('ec2-ip').textContent = data.ec2?.ip || 'N/A';
-      updateIndicator('ec2-indicator', data.ec2?.status === 'Online');
+      // Portal status  
+      const portalStatus = document.getElementById('ec2-status');
+      const portalVer = document.getElementById('ec2-disk');
+      const portalIp = document.getElementById('ec2-ip');
+      if (portalStatus) portalStatus.textContent = data.portal?.status || 'Online';
+      if (portalVer) portalVer.textContent = `v${data.portal?.version || '2.0'}`;
+      if (portalIp) portalIp.textContent = data.portal?.features?.length + ' features';
+      updateIndicator('ec2-indicator', true);
       
-      // Tailscale
-      document.getElementById('tailscale-devices').textContent = data.tailscale?.devices || '0';
-      document.getElementById('tailscale-status').textContent = data.tailscale?.connected ? 'Connected' : 'Disconnected';
-      updateIndicator('ts-indicator', data.tailscale?.connected);
-      
-      // Email
-      document.getElementById('email-unread').textContent = data.email?.unread || '0';
-      updateIndicator('email-indicator', true);
+      // Features
+      const tsDevices = document.getElementById('tailscale-devices');
+      const tsStatus = document.getElementById('tailscale-status');
+      if (tsDevices) tsDevices.textContent = data.portal?.features?.length || 4;
+      if (tsStatus) tsStatus.textContent = 'Active';
+      updateIndicator('ts-indicator', true);
       
       // Last updated
-      document.getElementById('lastUpdated').textContent = `Last updated: ${formatTime(new Date())}`;
+      const lastUpdated = document.getElementById('lastUpdated');
+      if (lastUpdated) lastUpdated.textContent = `Last updated: ${formatTime(new Date())}`;
       
       updateConnectionStatus(true);
     }
@@ -189,13 +183,11 @@ async function updateDashboard() {
 
 function updateIndicator(id, online) {
   const el = document.getElementById(id);
-  if (el) {
-    el.className = `card-status ${online ? 'online' : 'offline'}`;
-  }
+  if (el) el.className = `card-status ${online ? 'online' : 'offline'}`;
 }
 
 function refreshDashboard() {
-  showToast('Refreshing dashboard...');
+  showToast('Refreshing...');
   updateDashboard();
 }
 
@@ -204,19 +196,11 @@ function refreshDashboard() {
 // ==================
 
 function initKanban() {
-  // Load tasks from localStorage first
   const saved = localStorage.getItem(`${CONFIG.storagePrefix}tasks`);
-  if (saved) {
-    tasks = JSON.parse(saved);
-  }
+  if (saved) tasks = JSON.parse(saved);
   
-  // Try to load from API
   loadTasksFromAPI();
-  
-  // Setup drag and drop
   setupDragAndDrop();
-  
-  // Render
   renderTasks();
 }
 
@@ -227,27 +211,25 @@ async function loadTasksFromAPI() {
       const data = await response.json();
       if (data.todo || data.progress || data.done) {
         tasks = data;
-        saveTasks();
+        localStorage.setItem(`${CONFIG.storagePrefix}tasks`, JSON.stringify(tasks));
         renderTasks();
       }
     }
-  } catch (error) {
-    console.log('Using local tasks');
-  }
+  } catch {}
 }
 
 function renderTasks() {
   ['todo', 'progress', 'done'].forEach(status => {
     const container = document.getElementById(`${status}-cards`);
     const countEl = document.getElementById(`${status}-count`);
+    if (!container) return;
     
     container.innerHTML = '';
     const statusTasks = tasks[status] || [];
-    countEl.textContent = statusTasks.length;
+    if (countEl) countEl.textContent = statusTasks.length;
     
     statusTasks.forEach((task, index) => {
-      const card = createTaskCard(task, status, index);
-      container.appendChild(card);
+      container.appendChild(createTaskCard(task, status, index));
     });
   });
 }
@@ -259,27 +241,22 @@ function createTaskCard(task, status, index) {
   card.dataset.status = status;
   card.dataset.index = index;
   
-  const tagEmoji = {
-    task: '🏷️', feature: '✨', bug: '🐛', 
-    infra: '🔧', docs: '📝', urgent: '🔥'
-  };
+  const tagEmoji = { task: '🏷️', feature: '✨', bug: '🐛', infra: '🔧', docs: '📝', urgent: '🔥' };
   
   card.innerHTML = `
     <div class="card-header">
       <h4>${escapeHtml(task.title)}</h4>
       <div class="card-actions">
-        <button class="btn-icon-sm" onclick="editTask('${status}', ${index})" title="Edit">✏️</button>
-        <button class="btn-icon-sm" onclick="deleteTask('${status}', ${index})" title="Delete">🗑️</button>
+        <button class="btn-icon-sm" onclick="editTask('${status}', ${index})">✏️</button>
+        <button class="btn-icon-sm" onclick="deleteTask('${status}', ${index})">🗑️</button>
       </div>
     </div>
     ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ''}
     <div class="card-footer">
-      <span class="card-tag tag-${task.tag || 'task'}">${tagEmoji[task.tag] || '🏷️'} ${task.tag || 'task'}</span>
-      ${task.createdAt ? `<span class="card-date">${formatDate(task.createdAt)}</span>` : ''}
+      <span class="card-tag">${tagEmoji[task.tag] || '🏷️'} ${task.tag || 'task'}</span>
     </div>
   `;
   
-  // Drag events
   card.addEventListener('dragstart', handleDragStart);
   card.addEventListener('dragend', handleDragEnd);
   
@@ -299,10 +276,9 @@ let draggedCard = null;
 function handleDragStart(e) {
   draggedCard = this;
   this.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
 }
 
-function handleDragEnd(e) {
+function handleDragEnd() {
   this.classList.remove('dragging');
   document.querySelectorAll('.kanban-cards').forEach(col => col.classList.remove('drag-over'));
   draggedCard = null;
@@ -313,7 +289,7 @@ function handleDragOver(e) {
   this.classList.add('drag-over');
 }
 
-function handleDragLeave(e) {
+function handleDragLeave() {
   this.classList.remove('drag-over');
 }
 
@@ -327,25 +303,23 @@ function handleDrop(e) {
   const fromIndex = parseInt(draggedCard.dataset.index);
   const toStatus = this.id.replace('-cards', '');
   
-  // Move task
   const [task] = tasks[fromStatus].splice(fromIndex, 1);
   tasks[toStatus].push(task);
   
   saveTasks();
   renderTasks();
-  
-  showToast(`Task moved to ${toStatus}`);
+  showToast(`Moved to ${toStatus}`);
 }
 
 function openTaskModal(status = 'todo', index = null) {
   const modal = document.getElementById('taskModal');
   const form = document.getElementById('taskForm');
   
-  form.reset();
+  form?.reset();
   document.getElementById('taskId').value = '';
   document.getElementById('modalTitle').textContent = 'Add Task';
   
-  if (index !== null && tasks[status][index]) {
+  if (index !== null && tasks[status]?.[index]) {
     const task = tasks[status][index];
     document.getElementById('taskId').value = `${status}:${index}`;
     document.getElementById('taskTitle').value = task.title;
@@ -355,12 +329,12 @@ function openTaskModal(status = 'todo', index = null) {
     document.getElementById('modalTitle').textContent = 'Edit Task';
   }
   
-  modal.classList.add('open');
-  document.getElementById('taskTitle').focus();
+  modal?.classList.add('open');
+  document.getElementById('taskTitle')?.focus();
 }
 
 function closeTaskModal() {
-  document.getElementById('taskModal').classList.remove('open');
+  document.getElementById('taskModal')?.classList.remove('open');
 }
 
 function saveTask(e) {
@@ -377,7 +351,7 @@ function saveTask(e) {
   
   if (taskId) {
     const [status, index] = taskId.split(':');
-    task.createdAt = tasks[status][index].createdAt; // Keep original date
+    task.createdAt = tasks[status][index].createdAt;
     tasks[status][index] = task;
     showToast('Task updated');
   } else {
@@ -406,12 +380,11 @@ function deleteTask(status, index) {
 function saveTasks() {
   localStorage.setItem(`${CONFIG.storagePrefix}tasks`, JSON.stringify(tasks));
   
-  // Sync to API
   fetch(`${CONFIG.apiUrl}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(tasks)
-  }).catch(() => {}); // Silent fail
+  }).catch(() => {});
 }
 
 // ==================
@@ -419,9 +392,14 @@ function saveTasks() {
 // ==================
 
 async function loadNotes() {
-  // Show loading state
-  ['daily-notes', 'memory-notes', 'config-notes'].forEach(id => {
-    document.getElementById(id).innerHTML = '<div class="note-item loading">Loading...</div>';
+  const containers = {
+    daily: document.getElementById('daily-notes'),
+    memory: document.getElementById('memory-notes'),
+    config: document.getElementById('config-notes')
+  };
+  
+  Object.values(containers).forEach(c => {
+    if (c) c.innerHTML = '<div class="note-item loading">Loading...</div>';
   });
   
   try {
@@ -431,13 +409,10 @@ async function loadNotes() {
       notes = data.notes || [];
       renderNotes();
     }
-  } catch (error) {
-    // Fallback to default notes
+  } catch {
     notes = [
-      { id: 'today', name: new Date().toISOString().split('T')[0], type: 'daily' },
-      { id: 'memory', name: 'MEMORY.md', type: 'memory' },
-      { id: 'soul', name: 'SOUL.md', type: 'config' },
-      { id: 'tools', name: 'TOOLS.md', type: 'config' }
+      { id: 'memory', name: 'MEMORY.md', type: 'memory', icon: '🧠' },
+      { id: 'soul', name: 'SOUL.md', type: 'config', icon: '✨' }
     ];
     renderNotes();
   }
@@ -450,67 +425,80 @@ function renderNotes() {
     config: document.getElementById('config-notes')
   };
   
-  Object.values(containers).forEach(c => c.innerHTML = '');
+  Object.values(containers).forEach(c => { if (c) c.innerHTML = ''; });
   
   notes.forEach(note => {
     const item = document.createElement('div');
     item.className = 'note-item';
-    item.onclick = () => selectNote(note);
-    item.innerHTML = `<span>${note.name}</span>`;
+    item.onclick = () => selectNote(note, item);
+    item.innerHTML = `<span>${note.icon || '📄'} ${note.name}</span>`;
     
     const container = containers[note.type] || containers.config;
-    container.appendChild(item);
+    container?.appendChild(item);
   });
 }
 
-async function selectNote(note) {
+async function selectNote(note, element) {
   currentNote = note;
   
-  // Update UI
   document.querySelectorAll('.note-item').forEach(i => i.classList.remove('active'));
-  event.target.closest('.note-item').classList.add('active');
+  element?.classList.add('active');
   
-  document.getElementById('noteTitle').textContent = note.name;
-  document.getElementById('noteContent').value = 'Loading...';
-  document.getElementById('noteContent').readOnly = true;
+  const titleEl = document.getElementById('noteTitle');
+  const contentEl = document.getElementById('noteContent');
+  
+  if (titleEl) titleEl.textContent = note.name;
+  if (contentEl) {
+    contentEl.value = 'Loading...';
+    contentEl.readOnly = true;
+  }
   
   try {
     const response = await fetch(`${CONFIG.apiUrl}/notes?file=${encodeURIComponent(note.id)}`);
     if (response.ok) {
       const data = await response.json();
-      document.getElementById('noteContent').value = data.content || '';
-      document.getElementById('noteContent').readOnly = false;
+      if (contentEl) {
+        contentEl.value = data.content || '';
+        contentEl.readOnly = false;
+      }
     }
-  } catch (error) {
-    document.getElementById('noteContent').value = '# Could not load note\n\nConnect to Clawdbot Gateway to access notes.';
+  } catch {
+    if (contentEl) contentEl.value = 'Failed to load note.';
   }
 }
 
 async function saveNote() {
   if (!currentNote) return;
   
-  const content = document.getElementById('noteContent').value;
+  const content = document.getElementById('noteContent')?.value;
   
   try {
-    await fetch(`${CONFIG.apiUrl}/notes`, {
+    const response = await fetch(`${CONFIG.apiUrl}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file: currentNote.id, content })
     });
-    showToast('Note saved');
-  } catch (error) {
-    showToast('Could not save note', 'error');
+    
+    if (response.ok) {
+      showToast('Note saved');
+    } else {
+      showToast('Failed to save', 'error');
+    }
+  } catch {
+    showToast('Failed to save', 'error');
   }
 }
 
 function copyNote() {
-  const content = document.getElementById('noteContent').value;
-  navigator.clipboard.writeText(content);
-  showToast('Copied to clipboard');
+  const content = document.getElementById('noteContent')?.value;
+  if (content) {
+    navigator.clipboard.writeText(content);
+    showToast('Copied to clipboard');
+  }
 }
 
 function refreshNotes() {
-  showToast('Refreshing notes...');
+  showToast('Refreshing...');
   loadNotes();
 }
 
@@ -519,20 +507,21 @@ function refreshNotes() {
 // ==================
 
 function updateConnectionStatus(connected) {
-  isConnected = connected;
   const indicator = document.getElementById('connectionStatus');
   const text = document.getElementById('connectionText');
   
-  indicator.className = `status-indicator ${connected ? 'online' : 'offline'}`;
-  text.textContent = connected ? 'Connected' : 'Offline';
+  if (indicator) indicator.className = `status-indicator ${connected ? 'online' : 'offline'}`;
+  if (text) text.textContent = connected ? 'Connected' : 'Offline';
 }
 
 // ==================
-// Toast Notifications
+// Toast
 // ==================
 
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
+  if (!container) return;
+  
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
@@ -557,16 +546,7 @@ function escapeHtml(text) {
 }
 
 function formatTime(date) {
-  return date.toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit',
-    hour12: true 
-  });
-}
-
-function formatDate(dateStr) {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 // ==================
@@ -574,22 +554,14 @@ function formatDate(dateStr) {
 // ==================
 
 document.addEventListener('keydown', (e) => {
-  // Escape to close modals
-  if (e.key === 'Escape') {
-    closeTaskModal();
-  }
-  
-  // Cmd/Ctrl + K for quick nav
+  if (e.key === 'Escape') closeTaskModal();
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault();
-    messageInput.focus();
+    messageInput?.focus();
   }
-  
-  // Cmd/Ctrl + 1-4 for views
-  if ((e.metaKey || e.ctrlKey) && ['1', '2', '3', '4'].includes(e.key)) {
+  if ((e.metaKey || e.ctrlKey) && ['1','2','3','4'].includes(e.key)) {
     e.preventDefault();
-    const views = ['chat', 'dashboard', 'tasks', 'notes'];
-    navigateTo(views[parseInt(e.key) - 1]);
+    navigateTo(['chat', 'dashboard', 'tasks', 'notes'][parseInt(e.key) - 1]);
   }
 });
 
@@ -598,22 +570,18 @@ document.addEventListener('keydown', (e) => {
 // ==================
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Check initial hash
   const initialView = location.hash.slice(1) || 'chat';
   if (initialView !== 'chat') navigateTo(initialView);
   
-  // Init components
   initKanban();
   updateDashboard();
   
-  // Periodic refresh
   setInterval(updateDashboard, CONFIG.refreshInterval);
   
-  // Focus chat input
-  messageInput.focus();
+  messageInput?.focus();
 });
 
-// Expose functions for HTML onclick handlers
+// Global functions for onclick handlers
 window.openTaskModal = openTaskModal;
 window.closeTaskModal = closeTaskModal;
 window.saveTask = saveTask;
