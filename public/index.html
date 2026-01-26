@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova ✨ Portal</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">✨</span>
+                <span class="logo-text">Nova</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#chat" class="nav-link active" data-view="chat">💬 Chat</a></li>
+                <li><a href="#dashboard" class="nav-link" data-view="dashboard">📊 Dashboard</a></li>
+                <li><a href="#tasks" class="nav-link" data-view="tasks">📋 Tasks</a></li>
+                <li><a href="#notes" class="nav-link" data-view="notes">📝 Notes</a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="status-indicator online"></div>
+                <span>Connected</span>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Chat View -->
+            <div id="chat" class="view active">
+                <header class="view-header">
+                    <h1>Chat with Nova</h1>
+                    <span class="subtitle">Ask me anything ✨</span>
+                </header>
+                <div class="chat-container">
+                    <div class="messages" id="messages">
+                        <div class="message assistant">
+                            <div class="message-content">
+                                <p>Hey! I'm Nova. What can I help you with?</p>
+                            </div>
+                            <span class="message-time">Just now</span>
+                        </div>
+                    </div>
+                    <form class="chat-input" id="chatForm">
+                        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Dashboard View -->
+            <div id="dashboard" class="view">
+                <header class="view-header">
+                    <h1>Dashboard</h1>
+                    <span class="subtitle">System overview</span>
+                </header>
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h3>🖥️ Local VM</h3>
+                        <div class="stat">
+                            <span class="stat-value" id="vm-status">Online</span>
+                            <span class="stat-label">Status</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="vm-cpu">6 cores</span>
+                            <span class="stat-label">CPU</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>☁️ EC2 Instance</h3>
+                        <div class="stat">
+                            <span class="stat-value" id="ec2-status">Online</span>
+                            <span class="stat-label">Status</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="ec2-disk">70%</span>
+                            <span class="stat-label">Disk Used</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>🌐 Network</h3>
+                        <div class="stat">
+                            <span class="stat-value" id="tailscale-devices">3</span>
+                            <span class="stat-label">Tailscale Devices</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>📧 Gmail</h3>
+                        <div class="stat">
+                            <span class="stat-value" id="email-unread">0</span>
+                            <span class="stat-label">Unread</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tasks View (Kanban) -->
+            <div id="tasks" class="view">
+                <header class="view-header">
+                    <h1>Tasks</h1>
+                    <span class="subtitle">Kanban board</span>
+                    <button class="btn-primary" onclick="addTask()">+ Add Task</button>
+                </header>
+                <div class="kanban-board">
+                    <div class="kanban-column" data-status="todo">
+                        <h3>📥 To Do</h3>
+                        <div class="kanban-cards" id="todo-cards">
+                            <div class="kanban-card" draggable="true">
+                                <h4>Example Task</h4>
+                                <p>This is a sample task</p>
+                                <span class="card-tag">setup</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="kanban-column" data-status="progress">
+                        <h3>🔄 In Progress</h3>
+                        <div class="kanban-cards" id="progress-cards"></div>
+                    </div>
+                    <div class="kanban-column" data-status="done">
+                        <h3>✅ Done</h3>
+                        <div class="kanban-cards" id="done-cards">
+                            <div class="kanban-card" draggable="true">
+                                <h4>Set up VM</h4>
+                                <p>Created Nova's home</p>
+                                <span class="card-tag">infra</span>
+                            </div>
+                            <div class="kanban-card" draggable="true">
+                                <h4>Configure tools</h4>
+                                <p>Installed dev tools</p>
+                                <span class="card-tag">setup</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes View -->
+            <div id="notes" class="view">
+                <header class="view-header">
+                    <h1>Notes</h1>
+                    <span class="subtitle">Memory and logs</span>
+                </header>
+                <div class="notes-container">
+                    <div class="notes-list">
+                        <div class="note-item active">
+                            <h4>2026-01-25</h4>
+                            <p>Day One - Birth of Nova</p>
+                        </div>
+                        <div class="note-item">
+                            <h4>MEMORY.md</h4>
+                            <p>Long-term memory</p>
+                        </div>
+                    </div>
+                    <div class="note-content">
+                        <textarea id="noteEditor" placeholder="Select a note to view..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
