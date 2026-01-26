@@ -1247,3 +1247,87 @@ body {
     grid-column: span 1;
   }
 }
+
+/* ==================
+   Widget Picker Enhanced
+   ================== */
+
+.widget-section {
+  margin-bottom: 1.5rem;
+}
+
+.widget-section h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.widget-sortable,
+.widget-available {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.widget-option.draggable {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  transition: all 0.2s;
+}
+
+.widget-option.draggable:hover {
+  background: var(--bg-hover);
+}
+
+.widget-option.draggable.dragging {
+  opacity: 0.5;
+  background: var(--accent-soft);
+}
+
+.widget-option.available {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.widget-option.available:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent);
+}
+
+.drag-handle {
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: grab;
+}
+
+.add-icon {
+  color: var(--accent);
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.widget-info {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 1rem;
+}

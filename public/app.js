@@ -361,27 +361,119 @@ function closeWidgetPicker() {
 function renderWidgetPicker() {
   const container = document.getElementById('widgetList');
   if (!container) return;
-  container.innerHTML = widgets.available.map(w => `
-    <label class="widget-option">
-      <input type="checkbox" ${widgets.enabled.includes(w.id) ? 'checked' : ''} onchange="toggleWidget('${w.id}')">
-      <span>${w.icon} ${w.name}</span>
-    </label>
-  `).join('');
+  
+  // Render enabled widgets first (draggable), then available ones
+  const enabled = widgets.enabled.map(id => widgets.available.find(w => w.id === id)).filter(Boolean);
+  const disabled = widgets.available.filter(w => !widgets.enabled.includes(w.id));
+  
+  container.innerHTML = `
+    <div class="widget-section">
+      <h4>Active Widgets (drag to reorder)</h4>
+      <div class="widget-sortable" id="widgetSortable">
+        ${enabled.map(w => `
+          <div class="widget-option draggable" draggable="true" data-id="${w.id}">
+            <span class="drag-handle">⠿</span>
+            <span class="widget-info">${w.icon} ${w.name}</span>
+            <button class="btn-icon-sm" onclick="removeWidget('${w.id}')">✕</button>
+          </div>
+        `).join('') || '<p class="empty-state">No widgets enabled</p>'}
+      </div>
+    </div>
+    <div class="widget-section">
+      <h4>Available Widgets</h4>
+      <div class="widget-available">
+        ${disabled.map(w => `
+          <div class="widget-option available" onclick="addWidget('${w.id}')">
+            <span class="add-icon">+</span>
+            <span class="widget-info">${w.icon} ${w.name}</span>
+          </div>
+        `).join('') || '<p class="empty-state">All widgets enabled</p>'}
+      </div>
+    </div>
+  `;
+  
+  setupWidgetDragSort();
 }
 
-async function toggleWidget(id) {
-  if (widgets.enabled.includes(id)) {
-    widgets.enabled = widgets.enabled.filter(w => w !== id);
-  } else {
-    widgets.enabled.push(id);
-  }
+function setupWidgetDragSort() {
+  const container = document.getElementById('widgetSortable');
+  if (!container) return;
+  
+  const items = container.querySelectorAll('.draggable');
+  let dragItem = null;
+  
+  items.forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      dragItem = item;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      dragItem = null;
+      saveWidgetOrder();
+    });
+    
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!dragItem || dragItem === item) return;
+      const rect = item.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (e.clientY < midY) {
+        container.insertBefore(dragItem, item);
+      } else {
+        container.insertBefore(dragItem, item.nextSibling);
+      }
+    });
+  });
+}
+
+async function saveWidgetOrder() {
+  const container = document.getElementById('widgetSortable');
+  if (!container) return;
+  
+  const newOrder = Array.from(container.querySelectorAll('.draggable')).map(el => el.dataset.id);
+  widgets.enabled = newOrder;
+  
   await fetch(`${CONFIG.apiUrl}/widgets`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled: widgets.enabled })
   });
   renderDashboard();
-  showToast('Widgets updated');
+}
+
+async function addWidget(id) {
+  widgets.enabled.push(id);
+  await fetch(`${CONFIG.apiUrl}/widgets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: widgets.enabled })
+  });
+  renderWidgetPicker();
+  renderDashboard();
+  showToast('Widget added');
+}
+
+async function removeWidget(id) {
+  widgets.enabled = widgets.enabled.filter(w => w !== id);
+  await fetch(`${CONFIG.apiUrl}/widgets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: widgets.enabled })
+  });
+  renderWidgetPicker();
+  renderDashboard();
+  showToast('Widget removed');
+}
+
+async function toggleWidget(id) {
+  if (widgets.enabled.includes(id)) {
+    await removeWidget(id);
+  } else {
+    await addWidget(id);
+  }
 }
 
 function refreshDashboard() { showToast('Refreshing...'); updateStatus(); }
@@ -1091,6 +1183,8 @@ window.refreshDashboard = refreshDashboard;
 window.openWidgetPicker = openWidgetPicker;
 window.closeWidgetPicker = closeWidgetPicker;
 window.toggleWidget = toggleWidget;
+window.addWidget = addWidget;
+window.removeWidget = removeWidget;
 window.refreshNotes = refreshNotes;
 window.saveNote = saveNote;
 window.copyNote = copyNote;
