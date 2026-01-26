@@ -2,11 +2,12 @@
 <html lang="en" data-theme="tokyo">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Nova Portal - Personal dashboard and chat interface">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description" content="Nova Portal - Your personal AI dashboard">
     <meta name="theme-color" content="#7aa2f7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Nova ✨ Portal</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
@@ -16,183 +17,477 @@
 <body>
     <div class="app">
         <!-- Sidebar -->
-        <nav class="sidebar">
-            <div class="logo">
-                <span class="logo-icon">✨</span>
-                <span class="logo-text">Nova</span>
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="#" class="logo">
+                    <span class="logo-icon">✨</span>
+                    <span class="logo-text">Nova</span>
+                </a>
             </div>
-            <ul class="nav-links">
-                <li><a href="#chat" class="nav-link active" data-view="chat">💬 Chat</a></li>
-                <li><a href="#dashboard" class="nav-link" data-view="dashboard">📊 Dashboard</a></li>
-                <li><a href="#tasks" class="nav-link" data-view="tasks">📋 Tasks</a></li>
-                <li><a href="#calendar" class="nav-link" data-view="calendar">📆 Calendar</a></li>
-                <li><a href="#notes" class="nav-link" data-view="notes">📝 Notes</a></li>
-            </ul>
-            <div class="sidebar-bottom">
-                <button class="btn-icon" onclick="openCommandPalette()" title="Command Palette (⌘K)">🎯</button>
-                <button class="btn-icon" onclick="openNotifications()" title="Notifications" style="position:relative">
-                    🔔<span class="notification-badge" id="notificationBadge"></span>
+            
+            <!-- Project Switcher -->
+            <div class="project-switcher" id="projectSwitcher">
+                <button class="project-btn" onclick="toggleProjectMenu()">
+                    <span class="project-icon" id="currentProjectIcon">🏠</span>
+                    <span class="project-name" id="currentProjectName">Personal</span>
+                    <span class="project-chevron">▼</span>
                 </button>
-                <button class="btn-icon" onclick="openThemePicker()" title="Themes">🎨</button>
+                <div class="project-dropdown" id="projectDropdown">
+                    <div class="project-list" id="projectList"></div>
+                    <button class="project-add" onclick="openProjectModal()">
+                        <span>+</span> New Project
+                    </button>
+                </div>
             </div>
+            
+            <!-- Navigation -->
+            <ul class="nav-links">
+                <li class="nav-item">
+                    <a href="#chat" class="nav-link active" data-view="chat">
+                        <span class="nav-icon">💬</span>
+                        <span class="nav-text">Chat</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#dashboard" class="nav-link" data-view="dashboard">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#tasks" class="nav-link" data-view="tasks">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-text">Tasks</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#calendar" class="nav-link" data-view="calendar">
+                        <span class="nav-icon">📆</span>
+                        <span class="nav-text">Calendar</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#notes" class="nav-link" data-view="notes">
+                        <span class="nav-icon">📝</span>
+                        <span class="nav-text">Notes</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#reports" class="nav-link" data-view="reports">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">Reports</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <!-- Sidebar Footer -->
             <div class="sidebar-footer">
-                <div class="status-indicator" id="connectionStatus"></div>
-                <span id="connectionText">Connecting...</span>
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">Connecting...</span>
+                <button class="theme-btn" onclick="openThemeModal()" title="Theme">🎨</button>
             </div>
         </nav>
-
+        
+        <!-- Sidebar Overlay (Mobile) -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+        
         <!-- Main Content -->
-        <main class="content">
-            <!-- Chat View -->
-            <div id="chat" class="view active">
-                <header class="view-header">
-                    <h1>Chat with Nova</h1>
-                    <span class="subtitle">Ask me anything ✨</span>
-                </header>
-                <div class="chat-container">
-                    <div class="messages" id="messages">
-                        <div class="message assistant">
-                            <div class="message-avatar">✨</div>
-                            <div class="message-body">
-                                <div class="message-content">
-                                    <p>Hey Eric! I'm Nova. What can I help you with?</p>
-                                </div>
-                                <span class="message-time">Just now</span>
-                            </div>
-                        </div>
-                    </div>
-                    <form class="chat-input" id="chatForm">
-                        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
-                        <button type="submit" id="sendBtn">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
-                            </svg>
+        <main class="main-content">
+            <!-- Mobile Header -->
+            <header class="mobile-header">
+                <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+                <span class="mobile-title" id="mobileTitle">Chat</span>
+                <div class="mobile-actions">
+                    <button class="btn-icon" onclick="openCommandPalette()">🔍</button>
+                </div>
+            </header>
+            
+            <!-- View Container -->
+            <div class="view-container">
+                <!-- Chat View -->
+                <div id="chat" class="view active">
+                    <header class="view-header">
+                        <h1>Chat with Nova</h1>
+                        <button class="btn btn-secondary btn-sm" onclick="openCommandPalette()">
+                            <span class="kbd">⌘K</span>
                         </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Dashboard View -->
-            <div id="dashboard" class="view">
-                <header class="view-header">
-                    <h1>Dashboard</h1>
-                    <span class="subtitle">System overview</span>
-                    <button class="btn-secondary" onclick="refreshDashboard()">🔄 Refresh</button>
-                </header>
-                <div class="dashboard-grid" id="dashboardGrid">
-                    <!-- Widgets rendered by JS -->
-                </div>
-                <div class="dashboard-footer">
-                    <span id="lastUpdated">Last updated: Never</span>
-                    <button class="btn-secondary" onclick="openWidgetPicker()">+ Add Widget</button>
-                </div>
-            </div>
-
-            <!-- Tasks View -->
-            <div id="tasks" class="view">
-                <header class="view-header">
-                    <h1>Tasks</h1>
-                    <div class="project-selector">
-                        <select id="projectSelect" onchange="switchProject(this.value)">
-                            <option value="personal">🏠 Personal</option>
-                            <option value="laundromat">🧺 Laundromat</option>
-                            <option value="nova-dev">✨ Nova Dev</option>
-                        </select>
-                        <button class="btn-icon-sm" onclick="openProjectManager()" title="Manage Projects">⚙️</button>
-                    </div>
-                    <button class="btn-primary" onclick="openTaskModal()">+ Add Task</button>
-                </header>
-                <div class="kanban-board">
-                    <div class="kanban-column" data-status="todo">
-                        <div class="column-header">
-                            <h3>📥 To Do</h3>
-                            <span class="task-count" id="todo-count">0</span>
-                        </div>
-                        <div class="kanban-cards" id="todo-cards"></div>
-                    </div>
-                    <div class="kanban-column" data-status="progress">
-                        <div class="column-header">
-                            <h3>🔄 In Progress</h3>
-                            <span class="task-count" id="progress-count">0</span>
-                        </div>
-                        <div class="kanban-cards" id="progress-cards"></div>
-                    </div>
-                    <div class="kanban-column" data-status="done">
-                        <div class="column-header">
-                            <h3>✅ Done</h3>
-                            <span class="task-count" id="done-count">0</span>
-                        </div>
-                        <div class="kanban-cards" id="done-cards"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Calendar View -->
-            <div id="calendar" class="view">
-                <header class="view-header">
-                    <h1>Calendar</h1>
-                    <span class="subtitle" id="calendarMonth">January 2026</span>
-                    <div class="calendar-nav">
-                        <button class="btn-icon" onclick="prevMonth()">←</button>
-                        <button class="btn-secondary" onclick="goToToday()">Today</button>
-                        <button class="btn-icon" onclick="nextMonth()">→</button>
-                    </div>
-                    <button class="btn-primary" onclick="openEventModal()">+ Add Event</button>
-                </header>
-                <div class="calendar-container">
-                    <div class="calendar-header">
-                        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-                    </div>
-                    <div class="calendar-grid" id="calendarGrid"></div>
-                </div>
-                <div class="upcoming-events">
-                    <h3>📅 Upcoming</h3>
-                    <div id="upcomingEvents"></div>
-                </div>
-            </div>
-
-            <!-- Notes View -->
-            <div id="notes" class="view">
-                <header class="view-header">
-                    <h1>Notes</h1>
-                    <span class="subtitle">Memory and logs</span>
-                    <button class="btn-secondary" onclick="refreshNotes()">🔄 Refresh</button>
-                </header>
-                <div class="notes-container">
-                    <div class="notes-sidebar">
-                        <div class="notes-section">
-                            <h4>📅 Daily Notes</h4>
-                            <div class="notes-list" id="daily-notes"></div>
-                        </div>
-                        <div class="notes-section">
-                            <h4>🧠 Memory</h4>
-                            <div class="notes-list" id="memory-notes"></div>
-                        </div>
-                        <div class="notes-section">
-                            <h4>⚙️ Config</h4>
-                            <div class="notes-list" id="config-notes"></div>
-                        </div>
-                    </div>
-                    <div class="note-editor">
-                        <div class="editor-header">
-                            <h3 id="noteTitle">Select a note</h3>
-                            <div class="editor-actions">
-                                <button class="btn-icon" onclick="saveNote()" title="Save">💾</button>
-                                <button class="btn-icon" onclick="copyNote()" title="Copy">📋</button>
+                        <span class="view-subtitle">Ask me anything ✨</span>
+                    </header>
+                    <div class="chat-container">
+                        <div class="messages" id="messages">
+                            <div class="message assistant">
+                                <div class="message-avatar">✨</div>
+                                <div class="message-body">
+                                    <div class="message-content">
+                                        <p>Hey Eric! I'm Nova. What can I help you with?</p>
+                                    </div>
+                                    <span class="message-time">Just now</span>
+                                </div>
                             </div>
                         </div>
-                        <textarea id="noteContent" placeholder="Select a note to view..." readonly></textarea>
+                        <form class="chat-input" id="chatForm">
+                            <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
+                            <button type="submit">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"/>
+                                </svg>
+                            </button>
+                        </form>
                     </div>
+                </div>
+
+                <!-- Dashboard View -->
+                <div id="dashboard" class="view">
+                    <header class="view-header">
+                        <h1>Dashboard</h1>
+                        <div class="view-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">🔄 Refresh</button>
+                        </div>
+                        <span class="view-subtitle">System overview</span>
+                    </header>
+                    <div class="widgets-grid" id="widgetsGrid">
+                        <div class="widget" data-widget="gateway">
+                            <div class="widget-header">
+                                <span class="widget-title">🤖 Gateway</span>
+                                <span class="status-badge" id="gatewayStatus"></span>
+                            </div>
+                            <div class="widget-body">
+                                <div class="stats-grid">
+                                    <div class="stat">
+                                        <span class="stat-value" id="gwStatusVal">—</span>
+                                        <span class="stat-label">Status</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="gwAgent">—</span>
+                                        <span class="stat-label">Agent</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="widget" data-widget="portal">
+                            <div class="widget-header">
+                                <span class="widget-title">✨ Portal</span>
+                                <span class="status-badge online"></span>
+                            </div>
+                            <div class="widget-body">
+                                <div class="stats-grid">
+                                    <div class="stat">
+                                        <span class="stat-value">v4.0</span>
+                                        <span class="stat-label">Version</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="featureCount">10</span>
+                                        <span class="stat-label">Features</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="widget" data-widget="stats">
+                            <div class="widget-header">
+                                <span class="widget-title">📈 Quick Stats</span>
+                            </div>
+                            <div class="widget-body">
+                                <div class="stats-grid">
+                                    <div class="stat">
+                                        <span class="stat-value" id="statTasks">0</span>
+                                        <span class="stat-label">Tasks</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="statEvents">0</span>
+                                        <span class="stat-label">Events</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span class="stat-value" id="statNotes">0</span>
+                                        <span class="stat-label">Notes</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="widget wide" data-widget="upcoming">
+                            <div class="widget-header">
+                                <span class="widget-title">📆 Upcoming</span>
+                                <a href="#calendar" class="btn btn-ghost btn-sm" onclick="navigateTo('calendar')">View all →</a>
+                            </div>
+                            <div class="widget-body">
+                                <div class="events-list" id="upcomingWidget">
+                                    <div class="events-empty">No upcoming events</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="widget wide" data-widget="recent-tasks">
+                            <div class="widget-header">
+                                <span class="widget-title">📋 Recent Tasks</span>
+                                <a href="#tasks" class="btn btn-ghost btn-sm" onclick="navigateTo('tasks')">View all →</a>
+                            </div>
+                            <div class="widget-body">
+                                <div class="events-list" id="recentTasksWidget">
+                                    <div class="events-empty">No recent tasks</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tasks View -->
+                <div id="tasks" class="view">
+                    <header class="view-header">
+                        <h1>Tasks</h1>
+                        <button class="btn btn-primary btn-sm" onclick="openTaskModal()">+ Add</button>
+                        <span class="view-subtitle" id="tasksSubtitle">Personal Board</span>
+                    </header>
+                    <div class="kanban-board" id="kanbanBoard">
+                        <div class="kanban-column" data-status="todo">
+                            <div class="column-header">
+                                <span class="column-title">📥 To Do</span>
+                                <span class="column-count" id="todoCount">0</span>
+                            </div>
+                            <div class="kanban-cards" id="todoCards"></div>
+                        </div>
+                        <div class="kanban-column" data-status="progress">
+                            <div class="column-header">
+                                <span class="column-title">🔄 In Progress</span>
+                                <span class="column-count" id="progressCount">0</span>
+                            </div>
+                            <div class="kanban-cards" id="progressCards"></div>
+                        </div>
+                        <div class="kanban-column" data-status="done">
+                            <div class="column-header">
+                                <span class="column-title">✅ Done</span>
+                                <span class="column-count" id="doneCount">0</span>
+                            </div>
+                            <div class="kanban-cards" id="doneCards"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calendar View -->
+                <div id="calendar" class="view">
+                    <header class="view-header">
+                        <h1>Calendar</h1>
+                        <div class="view-actions">
+                            <button class="btn-icon" onclick="changeMonth(-1)">◀</button>
+                            <button class="btn btn-secondary btn-sm" onclick="goToToday()">Today</button>
+                            <button class="btn-icon" onclick="changeMonth(1)">▶</button>
+                            <button class="btn btn-primary btn-sm" onclick="openEventModal()">+ Event</button>
+                        </div>
+                        <span class="view-subtitle" id="calendarMonth">January 2026</span>
+                    </header>
+                    <div class="calendar-layout">
+                        <div class="calendar-main">
+                            <div class="calendar-weekdays">
+                                <span class="weekday">Sun</span>
+                                <span class="weekday">Mon</span>
+                                <span class="weekday">Tue</span>
+                                <span class="weekday">Wed</span>
+                                <span class="weekday">Thu</span>
+                                <span class="weekday">Fri</span>
+                                <span class="weekday">Sat</span>
+                            </div>
+                            <div class="calendar-days" id="calendarDays"></div>
+                        </div>
+                        <div class="calendar-sidebar">
+                            <h3 class="sidebar-title" id="selectedDateTitle">Today's Events</h3>
+                            <div class="events-list" id="dayEvents">
+                                <div class="events-empty">No events</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes View -->
+                <div id="notes" class="view">
+                    <header class="view-header">
+                        <h1>Notes</h1>
+                        <button class="btn btn-secondary btn-sm" onclick="refreshNotes()">🔄 Refresh</button>
+                        <span class="view-subtitle">Memory & logs</span>
+                    </header>
+                    <div class="notes-layout">
+                        <div class="notes-sidebar">
+                            <div class="notes-section">
+                                <div class="section-title">📅 Daily</div>
+                                <div id="dailyNotes"></div>
+                            </div>
+                            <div class="notes-section">
+                                <div class="section-title">🧠 Memory</div>
+                                <div id="memoryNotes"></div>
+                            </div>
+                            <div class="notes-section">
+                                <div class="section-title">⚙️ Config</div>
+                                <div id="configNotes"></div>
+                            </div>
+                        </div>
+                        <div class="note-editor">
+                            <div class="editor-header">
+                                <span class="editor-title" id="noteTitle">Select a note</span>
+                                <div class="editor-actions">
+                                    <button class="btn-icon" onclick="saveNote()" title="Save">💾</button>
+                                    <button class="btn-icon" onclick="copyNote()" title="Copy">📋</button>
+                                </div>
+                            </div>
+                            <textarea id="noteContent" placeholder="Select a note to view..." readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports View -->
+            <div id="reports" class="view">
+                <div class="view-container">
+                    <header class="view-header">
+                        <h1>Status Reports</h1>
+                        <button class="btn btn-secondary btn-sm" onclick="refreshReports()">🔄 Refresh</button>
+                    </header>
+                    
+                    <div class="reports-grid">
+                        <!-- Uptime Card -->
+                        <div class="report-card">
+                            <div class="report-header">
+                                <h3>📊 System Uptime</h3>
+                                <span class="report-period">Last 24h</span>
+                            </div>
+                            <div class="report-body">
+                                <div class="uptime-bars">
+                                    <div class="uptime-item">
+                                        <span class="uptime-label">Gateway</span>
+                                        <div class="uptime-bar"><div class="uptime-fill" id="uptimeGateway"></div></div>
+                                        <span class="uptime-pct" id="uptimeGatewayPct">--%</span>
+                                    </div>
+                                    <div class="uptime-item">
+                                        <span class="uptime-label">Tunnel</span>
+                                        <div class="uptime-bar"><div class="uptime-fill" id="uptimeTunnel"></div></div>
+                                        <span class="uptime-pct" id="uptimeTunnelPct">--%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Latency Card -->
+                        <div class="report-card">
+                            <div class="report-header">
+                                <h3>⚡ Performance</h3>
+                            </div>
+                            <div class="report-body">
+                                <div class="metric-big">
+                                    <span class="metric-value" id="avgLatency">--</span>
+                                    <span class="metric-unit">ms avg</span>
+                                </div>
+                                <p class="metric-sub"><span id="totalChecks">0</span> health checks</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Tasks Card -->
+                        <div class="report-card">
+                            <div class="report-header">
+                                <h3>📋 Task Metrics</h3>
+                            </div>
+                            <div class="report-body">
+                                <div class="task-metrics">
+                                    <div class="task-metric">
+                                        <span class="tm-value" id="tasksDone">0</span>
+                                        <span class="tm-label">Done</span>
+                                    </div>
+                                    <div class="task-metric">
+                                        <span class="tm-value" id="tasksProgress">0</span>
+                                        <span class="tm-label">In Progress</span>
+                                    </div>
+                                    <div class="task-metric">
+                                        <span class="tm-value" id="tasksPending">0</span>
+                                        <span class="tm-label">Pending</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Chat Card -->
+                        <div class="report-card">
+                            <div class="report-header">
+                                <h3>💬 Chat Activity</h3>
+                                <span class="report-period">Last 24h</span>
+                            </div>
+                            <div class="report-body">
+                                <div class="chat-metrics">
+                                    <div class="chat-metric">
+                                        <span class="cm-value" id="chatTotal">0</span>
+                                        <span class="cm-label">Total Messages</span>
+                                    </div>
+                                    <div class="chat-metric">
+                                        <span class="cm-value" id="chat24h">0</span>
+                                        <span class="cm-label">Last 24h</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Incidents Card -->
+                        <div class="report-card report-wide">
+                            <div class="report-header">
+                                <h3>🚨 Incidents</h3>
+                            </div>
+                            <div class="report-body">
+                                <div id="incidentsList" class="incidents-list">
+                                    <p class="no-incidents">No incidents recorded ✅</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="report-footer">Report generated: <span id="reportTime">--</span></p>
                 </div>
             </div>
         </main>
+        
+        <!-- Bottom Navigation (Mobile) -->
+        <nav class="bottom-nav">
+            <div class="bottom-nav-items">
+                <button class="bottom-nav-item active" data-view="chat" onclick="navigateTo('chat')">
+                    <span class="nav-icon">💬</span>
+                    <span>Chat</span>
+                </button>
+                <button class="bottom-nav-item" data-view="dashboard" onclick="navigateTo('dashboard')">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </button>
+                <button class="bottom-nav-item" data-view="tasks" onclick="navigateTo('tasks')">
+                    <span class="nav-icon">📋</span>
+                    <span>Tasks</span>
+                </button>
+                <button class="bottom-nav-item" data-view="calendar" onclick="navigateTo('calendar')">
+                    <span class="nav-icon">📆</span>
+                    <span>Calendar</span>
+                </button>
+                <button class="bottom-nav-item" data-view="notes" onclick="navigateTo('notes')">
+                    <span class="nav-icon">📝</span>
+                    <span>Notes</span>
+                </button>
+            </div>
+        </nav>
     </div>
 
     <!-- Command Palette -->
-    <div class="modal command-palette" id="commandPalette">
-        <div class="modal-content palette-content">
-            <input type="text" id="paletteSearch" placeholder="Type a command..." autocomplete="off">
-            <div class="palette-results" id="paletteResults"></div>
+    <div class="command-palette" id="commandPalette" onclick="if(event.target===this)closeCommandPalette()">
+        <div class="command-modal">
+            <div class="command-search">
+                <span class="command-search-icon">🔍</span>
+                <input type="text" id="commandInput" placeholder="Search commands..." autocomplete="off">
+                <span class="kbd">ESC</span>
+            </div>
+            <div class="command-results" id="commandResults"></div>
+            <div class="command-footer">
+                <span><span class="kbd">↑↓</span> Navigate</span>
+                <span><span class="kbd">↵</span> Select</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAB -->
+    <div class="fab" id="fab">
+        <button class="fab-btn" onclick="toggleFab()">
+            <span class="fab-icon">⚡</span>
+        </button>
+        <div class="fab-menu">
+            <button class="fab-item" onclick="quickAction('task')" title="New Task">📋</button>
+            <button class="fab-item" onclick="quickAction('event')" title="New Event">📆</button>
+            <button class="fab-item" onclick="quickAction('chat')" title="Chat">💬</button>
         </div>
     </div>
 
@@ -200,47 +495,43 @@
     <div class="modal" id="taskModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">Add Task</h3>
+                <span class="modal-title" id="taskModalTitle">Add Task</span>
                 <button class="btn-icon" onclick="closeTaskModal()">✕</button>
             </div>
             <form id="taskForm" onsubmit="saveTask(event)">
-                <input type="hidden" id="taskId">
-                <div class="form-group">
-                    <label for="taskTitle">Title</label>
-                    <input type="text" id="taskTitle" required placeholder="What needs to be done?">
-                </div>
-                <div class="form-group">
-                    <label for="taskDescription">Description</label>
-                    <textarea id="taskDescription" placeholder="Add details..."></textarea>
-                </div>
-                <div class="form-row">
+                <div class="modal-body">
+                    <input type="hidden" id="taskId">
                     <div class="form-group">
-                        <label for="taskTag">Tag</label>
-                        <select id="taskTag">
-                            <option value="task">🏷️ task</option>
-                            <option value="feature">✨ feature</option>
-                            <option value="bug">🐛 bug</option>
-                            <option value="infra">🔧 infra</option>
-                            <option value="docs">📝 docs</option>
-                            <option value="urgent">🔥 urgent</option>
-                        </select>
+                        <label class="form-label">Title</label>
+                        <input type="text" class="form-input" id="taskTitle" required placeholder="What needs to be done?">
                     </div>
                     <div class="form-group">
-                        <label for="taskPriority">Priority</label>
-                        <select id="taskPriority">
-                            <option value="low">Low</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                        </select>
+                        <label class="form-label">Description</label>
+                        <textarea class="form-textarea" id="taskDesc" placeholder="Details..."></textarea>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="taskDue">Due Date</label>
-                    <input type="date" id="taskDue">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Tag</label>
+                            <select class="form-select" id="taskTag">
+                                <option value="task">🏷️ Task</option>
+                                <option value="feature">✨ Feature</option>
+                                <option value="bug">🐛 Bug</option>
+                                <option value="urgent">🔥 Urgent</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Priority</label>
+                            <select class="form-select" id="taskPriority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-secondary" onclick="closeTaskModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Task</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
         </div>
@@ -250,90 +541,42 @@
     <div class="modal" id="eventModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Add Event</h3>
+                <span class="modal-title" id="eventModalTitle">Add Event</span>
                 <button class="btn-icon" onclick="closeEventModal()">✕</button>
             </div>
             <form id="eventForm" onsubmit="saveEvent(event)">
-                <input type="hidden" id="eventId">
-                <div class="form-group">
-                    <label for="eventTitle">Title</label>
-                    <input type="text" id="eventTitle" required placeholder="Event name">
-                </div>
-                <div class="form-row">
+                <div class="modal-body">
+                    <input type="hidden" id="eventId">
                     <div class="form-group">
-                        <label for="eventDate">Date</label>
-                        <input type="date" id="eventDate" required>
+                        <label class="form-label">Title</label>
+                        <input type="text" class="form-input" id="eventTitle" required placeholder="Event name">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-input" id="eventDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Time</label>
+                            <input type="time" class="form-input" id="eventTime">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label for="eventTime">Time</label>
-                        <input type="time" id="eventTime">
+                        <label class="form-label">Color</label>
+                        <select class="form-select" id="eventColor">
+                            <option value="blue">🔵 Blue</option>
+                            <option value="green">🟢 Green</option>
+                            <option value="red">🔴 Red</option>
+                            <option value="yellow">🟡 Yellow</option>
+                            <option value="purple">🟣 Purple</option>
+                        </select>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="eventNotes">Notes</label>
-                    <textarea id="eventNotes" placeholder="Additional details..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="eventReminder">
-                        <span>🔔 Remind me</span>
-                    </label>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-secondary" onclick="closeEventModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Event</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEventModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Theme Picker -->
-    <div class="modal" id="themePicker">
-        <div class="modal-content theme-picker-content">
-            <div class="modal-header">
-                <h3>🎨 Choose Theme</h3>
-                <button class="btn-icon" onclick="closeThemePicker()">✕</button>
-            </div>
-            <div class="theme-grid">
-                <button class="theme-option" onclick="setTheme('tokyo')" data-theme="tokyo">
-                    <span class="theme-preview tokyo"></span>
-                    <span>Tokyo Night</span>
-                </button>
-                <button class="theme-option" onclick="setTheme('dracula')" data-theme="dracula">
-                    <span class="theme-preview dracula"></span>
-                    <span>Dracula</span>
-                </button>
-                <button class="theme-option" onclick="setTheme('nord')" data-theme="nord">
-                    <span class="theme-preview nord"></span>
-                    <span>Nord</span>
-                </button>
-                <button class="theme-option" onclick="setTheme('light')" data-theme="light">
-                    <span class="theme-preview light"></span>
-                    <span>Light</span>
-                </button>
-                <button class="theme-option" onclick="setTheme('midnight')" data-theme="midnight">
-                    <span class="theme-preview midnight"></span>
-                    <span>Midnight</span>
-                </button>
-                <button class="theme-option" onclick="setTheme('forest')" data-theme="forest">
-                    <span class="theme-preview forest"></span>
-                    <span>Forest</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Widget Picker -->
-    <div class="modal" id="widgetPicker">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>🧩 Customize Widgets</h3>
-                <button class="btn-icon" onclick="closeWidgetPicker()">✕</button>
-            </div>
-            <div class="widget-picker-body" id="widgetList"></div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeWidgetPicker()">Done</button>
-            </div>
         </div>
     </div>
 
@@ -341,63 +584,86 @@
     <div class="modal" id="projectModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="projectModalTitle">New Project</h3>
+                <span class="modal-title">New Project</span>
                 <button class="btn-icon" onclick="closeProjectModal()">✕</button>
             </div>
             <form id="projectForm" onsubmit="saveProject(event)">
-                <input type="hidden" id="projectId">
-                <div class="form-group">
-                    <label for="projectName">Project Name</label>
-                    <input type="text" id="projectName" required placeholder="My Project">
-                </div>
-                <div class="form-row">
+                <div class="modal-body">
+                    <input type="hidden" id="projectId">
                     <div class="form-group">
-                        <label for="projectIcon">Icon</label>
-                        <input type="text" id="projectIcon" placeholder="📁" maxlength="2">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" id="projectName" required placeholder="Project name">
                     </div>
-                    <div class="form-group">
-                        <label for="projectColor">Color</label>
-                        <input type="color" id="projectColor" value="#7aa2f7">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Icon</label>
+                            <select class="form-select" id="projectIcon">
+                                <option value="🏠">🏠 Home</option>
+                                <option value="💼">💼 Work</option>
+                                <option value="🧺">🧺 Laundromat</option>
+                                <option value="✨">✨ Nova</option>
+                                <option value="🚀">🚀 Project</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Color</label>
+                            <select class="form-select" id="projectColor">
+                                <option value="blue">Blue</option>
+                                <option value="green">Green</option>
+                                <option value="purple">Purple</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-secondary" onclick="closeProjectModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Project</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeProjectModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Notifications Modal -->
-    <div class="modal" id="notificationsModal">
+    <!-- Theme Modal -->
+    <div class="modal" id="themeModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>🔔 Notifications</h3>
-                <button class="btn-icon" onclick="closeNotifications()">✕</button>
+                <span class="modal-title">🎨 Theme</span>
+                <button class="btn-icon" onclick="closeThemeModal()">✕</button>
             </div>
-            <div class="notifications-list" id="notificationsList"></div>
+            <div class="modal-body">
+                <div class="theme-grid">
+                    <button class="theme-option active" data-theme="tokyo" onclick="setTheme('tokyo')">
+                        <div class="theme-preview tokyo"></div>
+                        <span class="theme-name">Tokyo Night</span>
+                    </button>
+                    <button class="theme-option" data-theme="dracula" onclick="setTheme('dracula')">
+                        <div class="theme-preview dracula"></div>
+                        <span class="theme-name">Dracula</span>
+                    </button>
+                    <button class="theme-option" data-theme="nord" onclick="setTheme('nord')">
+                        <div class="theme-preview nord"></div>
+                        <span class="theme-name">Nord</span>
+                    </button>
+                    <button class="theme-option" data-theme="monokai" onclick="setTheme('monokai')">
+                        <div class="theme-preview monokai"></div>
+                        <span class="theme-name">Monokai</span>
+                    </button>
+                    <button class="theme-option" data-theme="light" onclick="setTheme('light')">
+                        <div class="theme-preview light"></div>
+                        <span class="theme-name">Light</span>
+                    </button>
+                    <button class="theme-option" data-theme="solarized" onclick="setTheme('solarized')">
+                        <div class="theme-preview solarized"></div>
+                        <span class="theme-name">Solarized</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Quick Actions FAB -->
-    <div class="fab-container">
-        <button class="fab" id="fabMain" onclick="toggleFabMenu()">⚡</button>
-        <div class="fab-menu" id="fabMenu">
-            <button class="fab-item" onclick="quickNewTask()">📋 New Task</button>
-            <button class="fab-item" onclick="quickNewEvent()">📆 New Event</button>
-            <button class="fab-item" onclick="quickChat()">💬 Quick Chat</button>
-            <button class="fab-item" onclick="openCommandPalette()">🎯 Commands</button>
-        </div>
-    </div>
-
-    <!-- Toast Notifications -->
+    <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="app.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(() => {});
-        }
-    </script>
 </body>
 </html>

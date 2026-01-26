@@ -28,6 +28,14 @@ export default {
         return await handleStatus(env, corsHeaders);
       }
       
+      // Status Reports / History
+      if (path === '/api/status/history') {
+        return await handleStatusHistory(env, corsHeaders);
+      }
+      if (path === '/api/reports') {
+        return await handleReports(env, corsHeaders);
+      }
+      
       // Tasks
       if (path === '/api/tasks' && request.method === 'GET') {
         return await handleGetTasks(env, corsHeaders);
@@ -223,10 +231,108 @@ async function handleStatus(env, corsHeaders) {
         events: events?.length || 0,
         messages: chat?.length || 0
       };
+      
+      // Log status snapshot for history
+      await logStatusSnapshot(env, status);
     } catch {}
   }
   
   return json(status, 200, corsHeaders);
+}
+
+async function logStatusSnapshot(env, status) {
+  if (!env.NOVA_KV) return;
+  
+  try {
+    const logs = await env.NOVA_KV.get('status-logs', 'json') || [];
+    logs.push({
+      timestamp: Date.now(),
+      gateway: status.gateway?.status,
+      latency: status.gateway?.latency,
+      agent: status.gateway?.agent,
+      tunnel: status.tunnel?.status
+    });
+    
+    // Keep last 288 entries (24h at 5min intervals)
+    await env.NOVA_KV.put('status-logs', JSON.stringify(logs.slice(-288)));
+  } catch {}
+}
+
+async function handleStatusHistory(env, corsHeaders) {
+  let logs = [];
+  if (env.NOVA_KV) {
+    logs = await env.NOVA_KV.get('status-logs', 'json') || [];
+  }
+  return json({ logs }, 200, corsHeaders);
+}
+
+async function handleReports(env, corsHeaders) {
+  const report = {
+    generated: Date.now(),
+    period: '24h',
+    uptime: { gateway: 0, tunnel: 0 },
+    avgLatency: 0,
+    totalChecks: 0,
+    incidents: [],
+    taskMetrics: {},
+    chatMetrics: {}
+  };
+  
+  if (!env.NOVA_KV) return json(report, 200, corsHeaders);
+  
+  try {
+    // Status history analysis
+    const logs = await env.NOVA_KV.get('status-logs', 'json') || [];
+    report.totalChecks = logs.length;
+    
+    if (logs.length > 0) {
+      const onlineChecks = logs.filter(l => l.gateway === 'Online').length;
+      const tunnelOnline = logs.filter(l => l.tunnel === 'Connected').length;
+      report.uptime.gateway = Math.round((onlineChecks / logs.length) * 100);
+      report.uptime.tunnel = Math.round((tunnelOnline / logs.length) * 100);
+      
+      const latencies = logs.filter(l => l.latency).map(l => l.latency);
+      report.avgLatency = latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
+      
+      // Find incidents (offline periods)
+      let incident = null;
+      logs.forEach((log, i) => {
+        if (log.gateway !== 'Online' && !incident) {
+          incident = { start: log.timestamp, type: 'gateway_down' };
+        } else if (log.gateway === 'Online' && incident) {
+          incident.end = log.timestamp;
+          incident.duration = incident.end - incident.start;
+          report.incidents.push(incident);
+          incident = null;
+        }
+      });
+      if (incident) report.incidents.push({ ...incident, ongoing: true });
+    }
+    
+    // Task metrics
+    const tasks = await env.NOVA_KV.get('tasks', 'json');
+    if (tasks) {
+      report.taskMetrics = {
+        total: (tasks.todo?.length || 0) + (tasks.progress?.length || 0) + (tasks.done?.length || 0),
+        completed: tasks.done?.length || 0,
+        inProgress: tasks.progress?.length || 0,
+        pending: tasks.todo?.length || 0
+      };
+    }
+    
+    // Chat metrics
+    const chat = await env.NOVA_KV.get('chat-history', 'json') || [];
+    const last24h = chat.filter(m => m.timestamp > Date.now() - 86400000);
+    report.chatMetrics = {
+      totalMessages: chat.length,
+      last24h: last24h.length,
+      userMessages: last24h.filter(m => m.role === 'user').length,
+      assistantMessages: last24h.filter(m => m.role === 'assistant').length
+    };
+    
+  } catch {}
+  
+  return json(report, 200, corsHeaders);
 }
 
 // ============ TASKS ============

@@ -74,6 +74,7 @@ function navigateTo(viewId) {
   if (viewId === 'calendar') renderCalendar();
   if (viewId === 'notes') loadNotes();
   if (viewId === 'tasks') renderTasks();
+  if (viewId === 'reports') loadReports();
 }
 
 window.addEventListener('popstate', () => navigateTo(location.hash.slice(1) || 'chat'));
@@ -1085,6 +1086,76 @@ function quickNewEvent() { toggleFabMenu(); navigateTo('calendar'); setTimeout((
 function quickChat() { toggleFabMenu(); navigateTo('chat'); messageInput?.focus(); }
 
 // ==================
+// Reports
+// ==================
+
+async function loadReports() {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/reports`);
+    if (response.ok) {
+      const report = await response.json();
+      renderReports(report);
+    }
+  } catch (e) {
+    console.error('Failed to load reports:', e);
+  }
+}
+
+function renderReports(report) {
+  // Uptime
+  const gwBar = document.getElementById('uptimeGateway');
+  const tnBar = document.getElementById('uptimeTunnel');
+  if (gwBar) gwBar.style.width = `${report.uptime?.gateway || 0}%`;
+  if (tnBar) tnBar.style.width = `${report.uptime?.tunnel || 0}%`;
+  setText('uptimeGatewayPct', `${report.uptime?.gateway || 0}%`);
+  setText('uptimeTunnelPct', `${report.uptime?.tunnel || 0}%`);
+  
+  // Performance
+  setText('avgLatency', report.avgLatency || '--');
+  setText('totalChecks', report.totalChecks || 0);
+  
+  // Tasks
+  setText('tasksDone', report.taskMetrics?.completed || 0);
+  setText('tasksProgress', report.taskMetrics?.inProgress || 0);
+  setText('tasksPending', report.taskMetrics?.pending || 0);
+  
+  // Chat
+  setText('chatTotal', report.chatMetrics?.totalMessages || 0);
+  setText('chat24h', report.chatMetrics?.last24h || 0);
+  
+  // Incidents
+  const incidentsList = document.getElementById('incidentsList');
+  if (incidentsList) {
+    if (!report.incidents?.length) {
+      incidentsList.innerHTML = '<p class="no-incidents">No incidents recorded ✅</p>';
+    } else {
+      incidentsList.innerHTML = report.incidents.map(inc => `
+        <div class="incident-item ${inc.ongoing ? 'ongoing' : ''}">
+          <span class="incident-icon">${inc.ongoing ? '🔴' : '🟡'}</span>
+          <div class="incident-info">
+            <strong>${inc.type === 'gateway_down' ? 'Gateway Offline' : 'Service Issue'}</strong>
+            <span>${formatTimeAgo(inc.start)}${inc.duration ? ` • ${Math.round(inc.duration / 60000)}m` : ' • Ongoing'}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+  
+  // Report time
+  setText('reportTime', new Date(report.generated).toLocaleString());
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function refreshReports() {
+  showToast('Refreshing reports...');
+  loadReports();
+}
+
+// ==================
 // Utilities
 // ==================
 
@@ -1198,3 +1269,5 @@ window.quickChat = quickChat;
 window.openNotifications = openNotifications;
 window.closeNotifications = closeNotifications;
 window.dismissNotification = dismissNotification;
+window.loadReports = loadReports;
+window.refreshReports = refreshReports;
