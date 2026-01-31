@@ -636,22 +636,15 @@ async function syncGoogleCalendar() {
 }
 
 function renderCalendarStatus() {
-  // Add connection status to calendar header if not connected
-  const header = document.querySelector('#calendar .view-header');
-  if (!header) return;
-  
-  let statusEl = document.getElementById('calendarConnectStatus');
-  if (!statusEl) {
-    statusEl = document.createElement('div');
-    statusEl.id = 'calendarConnectStatus';
-    statusEl.className = 'calendar-connect-status';
-    header.appendChild(statusEl);
-  }
+  const statusEl = document.getElementById('googleCalStatus');
+  if (!statusEl) return;
   
   if (state.calendarConnected) {
-    statusEl.innerHTML = '<span class="connect-badge connected">🟢 Google Calendar</span>';
+    statusEl.innerHTML = '<span class="connect-badge connected">🟢 Google</span>';
   } else if (state.googleAuthUrl) {
-    statusEl.innerHTML = `<a href="${state.googleAuthUrl}" class="btn btn-secondary btn-sm">🔗 Connect Google Calendar</a>`;
+    statusEl.innerHTML = `<a href="${state.googleAuthUrl}" class="btn btn-accent btn-sm" style="background:var(--accent);color:#fff;">🔗 Connect Google</a>`;
+  } else {
+    statusEl.innerHTML = '';
   }
 }
 
