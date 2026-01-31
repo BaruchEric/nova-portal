@@ -1180,6 +1180,14 @@ window.changeMonth = changeMonth;
 window.goToToday = goToToday;
 window.syncGoogleCalendar = syncGoogleCalendar;
 window.getAllEvents = getAllEvents;
+window.signOut = signOut;
+
+// Sign out from Cloudflare Access
+function signOut() {
+  if (confirm('Sign out of Nova Portal?')) {
+    window.location.href = '/cdn-cgi/access/logout';
+  }
+}
 window.refreshDashboard = refreshDashboard;
 window.refreshNotes = refreshNotes;
 window.saveNote = saveNote;
