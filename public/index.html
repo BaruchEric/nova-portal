@@ -139,12 +139,31 @@
                 <!-- Dashboard View -->
                 <div id="dashboard" class="view">
                     <header class="view-header">
-                        <h1>Dashboard</h1>
+                        <h1 id="greeting">Dashboard</h1>
                         <div class="view-actions">
                             <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">🔄 Refresh</button>
                         </div>
-                        <span class="view-subtitle">System overview</span>
+                        <span class="view-subtitle">Your command center ✨</span>
                     </header>
+                    
+                    <!-- Hero Section -->
+                    <div class="dashboard-hero">
+                        <div id="weatherWidget" class="hero-widget weather-widget">
+                            <div class="weather-loading">Loading weather...</div>
+                        </div>
+                        <div id="pomodoroWidget" class="hero-widget pomo-widget">
+                            <div class="pomo-loading">🎯 Focus Timer</div>
+                        </div>
+                        <div id="streakWidget" class="hero-widget streak-widget">
+                            <div class="streak-loading">🔥 --</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quote -->
+                    <div class="quote-banner" id="quoteWidget">
+                        <div class="quote-text">"Loading inspiration..."</div>
+                    </div>
+                    
                     <div class="widgets-grid" id="widgetsGrid">
                         <div class="widget" data-widget="gateway">
                             <div class="widget-header">
@@ -665,5 +684,6 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="app.js"></script>
+    <script src="enhancements.js"></script>
 </body>
 </html>

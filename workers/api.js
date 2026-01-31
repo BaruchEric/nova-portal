@@ -1,4 +1,4 @@
-// Nova Portal API v3.1 - Full Featured Worker
+// Nova Portal API v5.0 - Full Featured Worker
 // Real-time status, widgets, projects, notifications
 // ================================================
 
@@ -26,6 +26,11 @@ export default {
       // Real-time Status
       if (path === '/api/status') {
         return await handleStatus(env, corsHeaders);
+      }
+      
+      // System Stats
+      if (path === '/api/system') {
+        return await handleSystem(env, corsHeaders);
       }
       
       // Status Reports / History
@@ -256,6 +261,31 @@ async function logStatusSnapshot(env, status) {
     // Keep last 288 entries (24h at 5min intervals)
     await env.NOVA_KV.put('status-logs', JSON.stringify(logs.slice(-288)));
   } catch {}
+}
+
+async function handleSystem(env, corsHeaders) {
+  // Get system stats from gateway
+  const gatewayUrl = env.GATEWAY_URL || 'https://gateway.beric.ca';
+  const gatewayToken = env.GATEWAY_TOKEN;
+  
+  const stats = {
+    disk: null,
+    memory: null,
+    load: null
+  };
+  
+  // Try to get stats from gateway (would need a /system endpoint there)
+  // For now, return placeholder or cached values
+  if (env.NOVA_KV) {
+    try {
+      const cached = await env.NOVA_KV.get('system-stats', 'json');
+      if (cached) {
+        return json(cached, 200, corsHeaders);
+      }
+    } catch {}
+  }
+  
+  return json(stats, 200, corsHeaders);
 }
 
 async function handleStatusHistory(env, corsHeaders) {
