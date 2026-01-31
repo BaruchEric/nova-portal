@@ -2,6 +2,8 @@
 // Real-time status, widgets, projects, notifications
 // ================================================
 
+import { getAuthUrl, exchangeCodeForTokens, fetchCalendarEvents, getValidAccessToken } from './google-calendar.js';
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -63,6 +65,20 @@ export default {
       }
       if (path === '/api/events' && request.method === 'POST') {
         return await handleSaveEvents(request, env, corsHeaders);
+      }
+      
+      // Google Calendar OAuth
+      if (path === '/oauth/google') {
+        return Response.redirect(getAuthUrl(), 302);
+      }
+      if (path === '/oauth/callback') {
+        return await handleOAuthCallback(request, env, corsHeaders);
+      }
+      if (path === '/api/calendar/google') {
+        return await handleGoogleCalendar(env, corsHeaders);
+      }
+      if (path === '/api/calendar/status') {
+        return await handleCalendarStatus(env, corsHeaders);
       }
       
       // Widgets Config
@@ -286,6 +302,111 @@ async function handleSystem(env, corsHeaders) {
   }
   
   return json(stats, 200, corsHeaders);
+}
+
+// Google Calendar OAuth Callback
+async function handleOAuthCallback(request, env, corsHeaders) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get('code');
+  const error = url.searchParams.get('error');
+  
+  if (error) {
+    return new Response(`
+      <html><body style="font-family: system-ui; text-align: center; padding: 50px;">
+        <h1>❌ Authorization Failed</h1>
+        <p>${error}</p>
+        <a href="https://portal.beric.ca">Return to Portal</a>
+      </body></html>
+    `, { headers: { 'Content-Type': 'text/html' } });
+  }
+  
+  if (!code) {
+    return new Response('Missing authorization code', { status: 400 });
+  }
+  
+  try {
+    const tokens = await exchangeCodeForTokens(code);
+    
+    if (tokens.error) {
+      throw new Error(tokens.error_description || tokens.error);
+    }
+    
+    // Store tokens in KV
+    if (env.NOVA_KV) {
+      await env.NOVA_KV.put('google-tokens', JSON.stringify({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: Date.now() + (tokens.expires_in * 1000),
+        scope: tokens.scope
+      }));
+    }
+    
+    return new Response(`
+      <html><body style="font-family: system-ui; text-align: center; padding: 50px; background: #1a1b26; color: #c0caf5;">
+        <h1>✅ Calendar Connected!</h1>
+        <p>Your Google Calendar is now synced with Nova Portal.</p>
+        <a href="https://portal.beric.ca/#calendar" style="color: #7aa2f7;">Go to Calendar →</a>
+        <script>setTimeout(() => window.location.href = 'https://portal.beric.ca/#calendar', 2000);</script>
+      </body></html>
+    `, { headers: { 'Content-Type': 'text/html' } });
+  } catch (e) {
+    return new Response(`
+      <html><body style="font-family: system-ui; text-align: center; padding: 50px;">
+        <h1>❌ Error</h1>
+        <p>${e.message}</p>
+        <a href="https://portal.beric.ca">Return to Portal</a>
+      </body></html>
+    `, { headers: { 'Content-Type': 'text/html' } });
+  }
+}
+
+// Fetch Google Calendar Events
+async function handleGoogleCalendar(env, corsHeaders) {
+  try {
+    const accessToken = await getValidAccessToken(env);
+    
+    if (!accessToken) {
+      return json({ 
+        connected: false, 
+        authUrl: getAuthUrl(),
+        events: [] 
+      }, 200, corsHeaders);
+    }
+    
+    const data = await fetchCalendarEvents(accessToken);
+    
+    // Transform to portal format
+    const events = (data.items || []).map(event => ({
+      id: event.id,
+      title: event.summary || 'Untitled',
+      date: event.start?.date || event.start?.dateTime?.split('T')[0],
+      time: event.start?.dateTime ? new Date(event.start.dateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null,
+      endTime: event.end?.dateTime ? new Date(event.end.dateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null,
+      color: 'blue',
+      location: event.location,
+      description: event.description,
+      source: 'google'
+    }));
+    
+    return json({ connected: true, events }, 200, corsHeaders);
+  } catch (e) {
+    return json({ connected: false, error: e.message, events: [] }, 200, corsHeaders);
+  }
+}
+
+// Calendar Connection Status
+async function handleCalendarStatus(env, corsHeaders) {
+  if (!env.NOVA_KV) {
+    return json({ connected: false, authUrl: getAuthUrl() }, 200, corsHeaders);
+  }
+  
+  const tokens = await env.NOVA_KV.get('google-tokens', 'json');
+  
+  if (!tokens || !tokens.refresh_token) {
+    return json({ connected: false, authUrl: getAuthUrl() }, 200, corsHeaders);
+  }
+  
+  return json({ connected: true }, 200, corsHeaders);
 }
 
 async function handleStatusHistory(env, corsHeaders) {

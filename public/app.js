@@ -383,7 +383,7 @@ function updateUpcomingWidget() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  const upcoming = state.events
+  const upcoming = getAllEvents()
     .filter(e => new Date(e.date) >= today)
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .slice(0, 3);
@@ -606,7 +606,60 @@ function saveTasks() {
 
 function initCalendar() {
   state.events = load('events', []);
+  state.googleEvents = [];
+  state.calendarConnected = false;
   renderCalendar();
+  syncGoogleCalendar();
+}
+
+// Sync with Google Calendar
+async function syncGoogleCalendar() {
+  try {
+    const res = await fetch(`${CONFIG.apiUrl}/calendar/google`);
+    if (res.ok) {
+      const data = await res.json();
+      state.calendarConnected = data.connected;
+      state.googleAuthUrl = data.authUrl;
+      
+      if (data.connected && data.events) {
+        state.googleEvents = data.events;
+        renderCalendar();
+        renderCalendarStatus();
+        toast(`📅 Synced ${data.events.length} events from Google`);
+      } else if (!data.connected) {
+        renderCalendarStatus();
+      }
+    }
+  } catch (e) {
+    console.log('Google Calendar sync failed:', e);
+  }
+}
+
+function renderCalendarStatus() {
+  // Add connection status to calendar header if not connected
+  const header = document.querySelector('#calendar .view-header');
+  if (!header) return;
+  
+  let statusEl = document.getElementById('calendarConnectStatus');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.id = 'calendarConnectStatus';
+    statusEl.className = 'calendar-connect-status';
+    header.appendChild(statusEl);
+  }
+  
+  if (state.calendarConnected) {
+    statusEl.innerHTML = '<span class="connect-badge connected">🟢 Google Calendar</span>';
+  } else if (state.googleAuthUrl) {
+    statusEl.innerHTML = `<a href="${state.googleAuthUrl}" class="btn btn-secondary btn-sm">🔗 Connect Google Calendar</a>`;
+  }
+}
+
+function getAllEvents() {
+  // Merge local and Google events
+  const local = state.events || [];
+  const google = state.googleEvents || [];
+  return [...local, ...google];
 }
 
 function renderCalendar() {
@@ -659,7 +712,7 @@ function renderCalendar() {
 
 function createDayCell(day, date, otherMonth, isToday = false, isSelected = false) {
   const dateStr = date.toISOString().split('T')[0];
-  const dayEvents = state.events.filter(e => e.date === dateStr);
+  const dayEvents = getAllEvents().filter(e => e.date === dateStr);
   
   const classes = ['calendar-day'];
   if (otherMonth) classes.push('other-month');
@@ -686,7 +739,7 @@ function selectDate(dateStr) {
 function updateDayEvents() {
   const container = $('#dayEvents');
   const dateStr = state.selectedDate.toISOString().split('T')[0];
-  const dayEvents = state.events.filter(e => e.date === dateStr);
+  const dayEvents = getAllEvents().filter(e => e.date === dateStr);
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -700,15 +753,22 @@ function updateDayEvents() {
     return;
   }
   
-  container.innerHTML = dayEvents.map((e, i) => `
-    <div class="event-item" onclick="editEvent(${state.events.indexOf(e)})">
-      <div class="event-color ${e.color || 'blue'}"></div>
-      <div class="event-info">
-        <div class="event-title">${escapeHtml(e.title)}</div>
-        <div class="event-time">${e.time || 'All day'}</div>
+  container.innerHTML = dayEvents.map((e, i) => {
+    const isGoogle = e.source === 'google';
+    const localIdx = state.events.indexOf(e);
+    const onclick = isGoogle ? '' : `onclick="editEvent(${localIdx})"`;
+    const sourceIcon = isGoogle ? '<span class="event-source" title="Google Calendar">📅</span>' : '';
+    return `
+      <div class="event-item ${isGoogle ? 'google-event' : ''}" ${onclick}>
+        <div class="event-color ${e.color || 'blue'}"></div>
+        <div class="event-info">
+          <div class="event-title">${escapeHtml(e.title)} ${sourceIcon}</div>
+          <div class="event-time">${e.time || 'All day'}${e.endTime ? ' - ' + e.endTime : ''}</div>
+          ${e.location ? `<div class="event-location">📍 ${escapeHtml(e.location)}</div>` : ''}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function changeMonth(delta) {
@@ -1125,6 +1185,8 @@ window.editEvent = editEvent;
 window.selectDate = selectDate;
 window.changeMonth = changeMonth;
 window.goToToday = goToToday;
+window.syncGoogleCalendar = syncGoogleCalendar;
+window.getAllEvents = getAllEvents;
 window.refreshDashboard = refreshDashboard;
 window.refreshNotes = refreshNotes;
 window.saveNote = saveNote;
