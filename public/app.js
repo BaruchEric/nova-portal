@@ -1185,7 +1185,10 @@ window.signOut = signOut;
 // Sign out from Cloudflare Access
 function signOut() {
   if (confirm('Sign out of Nova Portal?')) {
-    window.location.href = '/cdn-cgi/access/logout';
+    // Clear local storage
+    localStorage.clear();
+    // Redirect to Cloudflare Access logout
+    window.location.href = 'https://portal.beric.ca/cdn-cgi/access/logout?returnTo=https://portal.beric.ca';
   }
 }
 window.refreshDashboard = refreshDashboard;
