@@ -2,7 +2,7 @@
 // =========================================
 
 const CONFIG = {
-  apiUrl: 'https://nova-portal-api.ericbaruch.workers.dev/api',
+  apiUrl: 'https://api.beric.ca/api',
   refreshInterval: 30000,
   storagePrefix: 'nova-'
 };

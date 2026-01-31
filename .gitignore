@@ -1,0 +1,4 @@
+
+# Wrangler build artifacts
+workers/.wrangler/
+workers/node_modules/
