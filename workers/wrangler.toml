@@ -3,10 +3,10 @@ main = "api.js"
 compatibility_date = "2024-01-01"
 
 # KV namespace for task persistence
-# Uncomment after creating: wrangler kv:namespace create "NOVA_KV"
-# [[kv_namespaces]]
-# binding = "NOVA_KV"
-# id = "your-kv-namespace-id"
+[[kv_namespaces]]
+binding = "NOVA_KV"
+id = "faf0947a696741aa988014ee05935f61"
+preview_id = "ef64fa574d72442c879e136f2736dc57"
 
 [vars]
 # Set these in Cloudflare dashboard for security
