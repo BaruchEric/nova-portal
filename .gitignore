@@ -2,3 +2,4 @@
 # Wrangler build artifacts
 workers/.wrangler/
 workers/node_modules/
+workers/.dev.vars
